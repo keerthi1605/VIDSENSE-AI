@@ -11,7 +11,7 @@ relevant moment, and answers with a timestamp you can jump to.
 Being built incrementally, phase by phase. Each phase is left in a stable, working state
 before the next begins — see [`docs/architecture.md`](docs/architecture.md) for the full roadmap.
 
-- [x] Phase 1 — Video upload + Whisper transcription — **Step 1 (project setup) in progress**
+- [x] Phase 1 — Video upload + Whisper transcription — **Step 2 (video upload) done, Step 3 (transcription) next**
 - [ ] Phase 2 — Transcript chunking + text embeddings
 - [ ] Phase 3 — Vector database + semantic search
 - [ ] Phase 4 — RAG question answering

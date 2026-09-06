@@ -69,7 +69,7 @@ Each phase must leave the project runnable end-to-end before the next begins.
 - **No fake AI** — every library/technology added must solve a real problem in the
   current phase. Nothing is added "because it's popular."
 
-## Current state (Phase 1, Step 1)
+## Current state (Phase 1, Step 2)
 
 - FastAPI app skeleton (`backend/app/main.py`) with a `GET /health` endpoint.
 - Centralized settings (`backend/app/core/config.py`) covering storage paths and
@@ -77,5 +77,9 @@ Each phase must leave the project runnable end-to-end before the next begins.
   small to accelerate inference).
 - Storage directories (`videos/`, `audio/`, `frames/`, `transcripts/`, `embeddings/`)
   created under `backend/storage/`.
-- No video upload, transcription, chunking, retrieval, or LLM logic yet — those are
-  Phase 1 Step 2 onward.
+- `POST /api/videos/upload` — validates extension and streams the file to disk
+  under a generated `video_id` (never the client-supplied filename), enforcing
+  the configured size cap mid-stream. Persists a JSON metadata sidecar
+  (`storage/videos/{video_id}.json`) alongside the video file.
+- No audio extraction, transcription, chunking, retrieval, or LLM logic yet —
+  those are Phase 1 Step 3 onward.

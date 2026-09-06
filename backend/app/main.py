@@ -10,6 +10,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from app.api.video import router as video_router
 from app.core.config import settings
 from app.core.logging import configure_logging, get_logger
 
@@ -32,6 +33,8 @@ app = FastAPI(
     debug=settings.debug,
     lifespan=lifespan,
 )
+
+app.include_router(video_router)
 
 
 @app.get("/health", tags=["system"])

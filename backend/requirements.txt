@@ -9,8 +9,10 @@ python-dotenv==1.0.1
 pytest==8.3.4
 httpx==0.28.1          # required by fastapi.testclient.TestClient
 
-# --- Phase 1: Step 2+ (video upload, audio, transcription) ---
+# --- Phase 1: Step 2 (video upload) ---
+python-multipart==0.0.19      # required by FastAPI for multipart file uploads
+
+# --- Phase 1: Step 3+ (audio extraction, transcription) ---
 # Uncommented as each step is implemented, so `pip install -r requirements.txt`
 # always matches what the current phase actually needs.
-# python-multipart==0.0.19      # required by FastAPI for multipart file uploads
 # faster-whisper==1.1.0         # speech-to-text transcription (CPU/int8 on this machine)
