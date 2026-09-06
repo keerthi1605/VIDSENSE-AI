@@ -1,0 +1,51 @@
+"""
+VidSense AI — FastAPI application entrypoint.
+
+Phase 1 scope: just enough to prove the server runs, config loads, and
+storage directories exist. Video upload/transcription endpoints are
+added in the next steps of Phase 1 (see docs/architecture.md).
+"""
+
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI
+
+from app.core.config import settings
+from app.core.logging import configure_logging, get_logger
+
+configure_logging()
+logger = get_logger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup: make sure every storage subfolder exists before any
+    # request tries to write into it (upload, audio extraction, etc.)
+    settings.ensure_storage_dirs()
+    logger.info("Storage directories ready at %s", settings.storage_dir)
+    yield
+    # Shutdown: nothing to clean up yet.
+
+
+app = FastAPI(
+    title=settings.app_name,
+    debug=settings.debug,
+    lifespan=lifespan,
+)
+
+
+@app.get("/health", tags=["system"])
+def health_check() -> dict:
+    """
+    Liveness/readiness probe.
+
+    Returns basic app metadata so we can confirm, from the response
+    alone, that the correct config was loaded (e.g. which Whisper
+    model size this deployment is configured for).
+    """
+    return {
+        "status": "ok",
+        "app_name": settings.app_name,
+        "whisper_model_size": settings.whisper_model_size,
+        "whisper_device": settings.whisper_device,
+    }

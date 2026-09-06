@@ -1,0 +1,39 @@
+# --- Python ---
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+backend/venv/
+*.egg-info/
+
+# --- Environment / secrets ---
+.env
+backend/.env
+
+# --- Node / frontend (added in Phase 8) ---
+node_modules/
+frontend/dist/
+frontend/build/
+
+# --- Storage (actual media/data, keep folder structure via .gitkeep) ---
+backend/storage/videos/*
+!backend/storage/videos/.gitkeep
+backend/storage/audio/*
+!backend/storage/audio/.gitkeep
+backend/storage/frames/*
+!backend/storage/frames/.gitkeep
+backend/storage/transcripts/*
+!backend/storage/transcripts/.gitkeep
+backend/storage/embeddings/*
+!backend/storage/embeddings/.gitkeep
+
+# --- Vector DB / model caches (added later phases) ---
+backend/chroma_db/
+.cache/
+
+# --- OS / editor ---
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

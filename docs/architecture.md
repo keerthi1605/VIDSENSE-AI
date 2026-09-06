@@ -1,0 +1,81 @@
+# VidSense AI — Architecture & Roadmap
+
+## Problem
+
+Traditional video search relies on title/description/tags/filename metadata and cannot
+answer content-level questions like *"where does the professor explain binary search?"*.
+VidSense AI indexes what's actually **said** (audio, via Whisper) and **shown**
+(visual, via CLIP-style embeddings) in a video, so it can be searched semantically and
+questioned via RAG (Retrieval-Augmented Generation).
+
+## Pipeline (target, full system)
+
+```text
+Video
+  |
+  +--------------------+
+  |                    |
+  v                    v
+Audio                Video Frames
+  |                    |
+  v                    v
+Whisper              Vision Model
+  |                    |
+  v                    v
+Transcript          Visual Embeddings
+  |                    |
+  +---------+----------+
+            |
+            v
+      Multimodal Index (ChromaDB)
+            |
+            v
+      User Question -> Query Embedding -> Retrieval
+            |
+            v
+ Relevant Transcript + Frames -> LLM -> Answer + Evidence + Timestamp
+```
+
+## Phase roadmap
+
+1. Video upload + Whisper transcription (timestamped)
+2. Transcript chunking + text embeddings
+3. Vector database + semantic search
+4. RAG question answering (LLM over retrieved context)
+5. Visual understanding (frame sampling + CLIP embeddings)
+6. Multimodal retrieval (text + visual score fusion)
+7. Timestamp-aware answers (jump-to-video)
+8. Frontend (React: player + transcript + chat)
+9. Database + background job processing (PostgreSQL, job states)
+10. Evaluation (WER, Precision@K/Recall@K/MRR, faithfulness)
+11. Optimization (reranking, hybrid search, caching, GPU/quantization)
+12. Deployment (Docker Compose) + documentation
+
+Each phase must leave the project runnable end-to-end before the next begins.
+
+## Design principles
+
+- **Modularity** — API / business logic (services) / AI models / storage / DB stay
+  in separate layers; a service never talks to FastAPI request objects directly.
+- **Timestamp preservation** — every transcript segment, chunk, and retrieval result
+  carries `start_time`/`end_time` so any answer is traceable back to an exact moment
+  in the source video. This must survive transcription → chunking → embedding →
+  retrieval → RAG without being dropped.
+- **Model abstraction** — no component hard-codes one LLM, one embedding model, or
+  one vector DB. Configuration (`backend/app/core/config.py`) is the single place
+  those choices live, so they can be swapped later.
+- **Explainability** — every answer must be able to cite *which* transcript segment
+  (with timestamps) it was based on.
+- **No fake AI** — every library/technology added must solve a real problem in the
+  current phase. Nothing is added "because it's popular."
+
+## Current state (Phase 1, Step 1)
+
+- FastAPI app skeleton (`backend/app/main.py`) with a `GET /health` endpoint.
+- Centralized settings (`backend/app/core/config.py`) covering storage paths and
+  Whisper model configuration (CPU/int8, given this dev machine's GPU is too old/
+  small to accelerate inference).
+- Storage directories (`videos/`, `audio/`, `frames/`, `transcripts/`, `embeddings/`)
+  created under `backend/storage/`.
+- No video upload, transcription, chunking, retrieval, or LLM logic yet — those are
+  Phase 1 Step 2 onward.
