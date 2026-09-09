@@ -93,4 +93,19 @@ Each phase must leave the project runnable end-to-end before the next begins.
   transcription with correct timestamps; first transcription ~2 minutes
   (includes one-time model download + load), subsequent transcriptions in the
   same process ~2.4 seconds.
-- No chunking, embeddings, vector search, or LLM logic yet — that's Phase 2.
+
+### Phase 2, Step 1 — Transcript chunking
+
+- `app/services/chunking_service.py` — merges consecutive `TranscriptSegment`s
+  into `Chunk`s targeting `chunk_target_words` (default 150), carrying the
+  last `chunk_overlap_segments` (default 1) segments into the next chunk for
+  boundary continuity. Chunk `start_time`/`end_time` are always taken
+  directly from real segment timestamps — never interpolated.
+- `POST /api/videos/{video_id}/chunks` — chunk a video's saved transcript
+- `GET /api/videos/{video_id}/chunks` — fetch a previously computed chunk set
+- Verified on real Whisper output (a two-topic synthesized lecture): with a
+  lowered word target, chunk boundaries landed sensibly at the topic shift,
+  and overlap was visibly preserving boundary-spanning sentences across
+  adjacent chunks.
+- No embeddings, vector search, or LLM logic yet — embeddings are Phase 2,
+  Step 2.

@@ -7,8 +7,8 @@ return its result. No business logic lives here.
 
 from fastapi import APIRouter, File, HTTPException, UploadFile
 
-from app.models.schemas import Transcript, TranscribeRequest, VideoMetadata
-from app.services import audio_service, transcription_service, video_service
+from app.models.schemas import ChunkSet, Transcript, TranscribeRequest, VideoMetadata
+from app.services import audio_service, chunking_service, transcription_service, video_service
 
 router = APIRouter(prefix="/api/videos", tags=["videos"])
 
@@ -64,3 +64,37 @@ def get_transcript(video_id: str) -> Transcript:
             "Has it been transcribed yet?",
         )
     return transcript
+
+
+@router.post("/{video_id}/chunks", response_model=ChunkSet)
+def chunk_video(video_id: str) -> ChunkSet:
+    """
+    Chunk a video's saved transcript into embedding-sized pieces.
+
+    Requires transcription to have already run -- chunking has nothing
+    to operate on otherwise. This is deliberately its own step (not
+    folded into /transcribe) so each pipeline stage stays independently
+    inspectable and re-runnable, matching how the phases themselves
+    are separated.
+    """
+    transcript = transcription_service.get_transcript(video_id)
+    if transcript is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No transcript found for video '{video_id}'. "
+            "Transcribe it first via POST /api/videos/transcribe.",
+        )
+    return chunking_service.chunk_and_save(transcript)
+
+
+@router.get("/{video_id}/chunks", response_model=ChunkSet)
+def get_chunks(video_id: str) -> ChunkSet:
+    """Fetch a previously computed chunk set for a video."""
+    chunk_set = chunking_service.get_chunk_set(video_id)
+    if chunk_set is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No chunks found for video '{video_id}'. "
+            "Has it been chunked yet?",
+        )
+    return chunk_set

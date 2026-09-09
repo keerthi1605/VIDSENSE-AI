@@ -27,6 +27,8 @@ backend/storage/transcripts/*
 !backend/storage/transcripts/.gitkeep
 backend/storage/embeddings/*
 !backend/storage/embeddings/.gitkeep
+backend/storage/chunks/*
+!backend/storage/chunks/.gitkeep
 
 # --- Vector DB / model caches (added later phases) ---
 backend/chroma_db/

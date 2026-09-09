@@ -56,3 +56,37 @@ class Transcript(BaseModel):
     model_size: str
     created_at: datetime
     segments: List[TranscriptSegment]
+
+
+class Chunk(BaseModel):
+    """
+    A group of consecutive transcript segments, sized for embedding.
+
+    chunk_id is globally unique (prefixed with video_id) and doubles as
+    the record ID we'll hand to the vector database in Phase 3 -- no
+    separate ID scheme needed there.
+
+    start_time/end_time come directly from the first/last merged
+    segment's real timestamps (never interpolated), per the project's
+    timestamp-preservation principle.
+    """
+
+    chunk_id: str
+    video_id: str
+    chunk_index: int
+    start_time: float
+    end_time: float
+    text: str
+    word_count: int
+
+
+class ChunkSet(BaseModel):
+    """The full set of chunks for one video, plus the settings used to
+    produce them -- useful for debugging "why did chunking look like
+    this" without cross-referencing config history."""
+
+    video_id: str
+    created_at: datetime
+    chunk_target_words: int
+    chunk_overlap_segments: int
+    chunks: List[Chunk]

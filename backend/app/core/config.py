@@ -46,6 +46,7 @@ class Settings(BaseSettings):
     frames_dir: Path = storage_dir / "frames"
     transcripts_dir: Path = storage_dir / "transcripts"
     embeddings_dir: Path = storage_dir / "embeddings"
+    chunks_dir: Path = storage_dir / "chunks"
 
     # --- Upload constraints (Phase 1) ---
     max_upload_size_mb: int = 1024  # 1 GB ceiling, revisit later
@@ -65,6 +66,17 @@ class Settings(BaseSettings):
     ffmpeg_binary: str = "ffmpeg"
     audio_sample_rate_hz: int = 16000  # Whisper's expected input rate
 
+    # --- Chunking (Phase 2) ---
+    # Chunks are built by merging consecutive Whisper segments until this
+    # many words is reached -- NOT by cutting raw text at a fixed character
+    # offset. This keeps every chunk's start/end time exact (taken directly
+    # from real segment boundaries) instead of interpolated.
+    chunk_target_words: int = 150
+    # How many trailing segments of a chunk get repeated at the start of
+    # the next chunk, so ideas that span a chunk boundary still appear in
+    # both chunks' embeddings.
+    chunk_overlap_segments: int = 1
+
     def ensure_storage_dirs(self) -> None:
         """Create all storage subdirectories if they don't already exist."""
         for d in (
@@ -73,6 +85,7 @@ class Settings(BaseSettings):
             self.frames_dir,
             self.transcripts_dir,
             self.embeddings_dir,
+            self.chunks_dir,
         ):
             d.mkdir(parents=True, exist_ok=True)
 

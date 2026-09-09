@@ -12,7 +12,7 @@ Being built incrementally, phase by phase. Each phase is left in a stable, worki
 before the next begins — see [`docs/architecture.md`](docs/architecture.md) for the full roadmap.
 
 - [x] Phase 1 — Video upload + Whisper transcription — **complete**
-- [ ] Phase 2 — Transcript chunking + text embeddings
+- [ ] Phase 2 — Transcript chunking + text embeddings — **Step 1 (chunking) done, Step 2 (embeddings) next**
 - [ ] Phase 3 — Vector database + semantic search
 - [ ] Phase 4 — RAG question answering
 - [ ] Phase 5 — Visual understanding (frame extraction + CLIP)
@@ -72,6 +72,12 @@ curl -X POST http://127.0.0.1:8000/api/videos/transcribe \
 
 # 3. Fetch the transcript any time after
 curl http://127.0.0.1:8000/api/videos/<video_id>/transcript
+
+# 4. Chunk the transcript into embedding-sized pieces
+curl -X POST http://127.0.0.1:8000/api/videos/<video_id>/chunks
+
+# 5. Fetch the chunk set any time after
+curl http://127.0.0.1:8000/api/videos/<video_id>/chunks
 ```
 
 ## Repository structure
