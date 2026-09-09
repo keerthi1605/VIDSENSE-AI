@@ -7,11 +7,19 @@ return its result. No business logic lives here.
 
 from fastapi import APIRouter, File, HTTPException, UploadFile
 
-from app.models.schemas import ChunkSet, EmbeddingSet, Transcript, TranscribeRequest, VideoMetadata
+from app.models.schemas import (
+    ChunkSet,
+    EmbeddingSet,
+    IndexResult,
+    Transcript,
+    TranscribeRequest,
+    VideoMetadata,
+)
 from app.services import (
     audio_service,
     chunking_service,
     embedding_service,
+    retrieval_service,
     transcription_service,
     video_service,
 )
@@ -140,3 +148,32 @@ def get_embeddings(video_id: str) -> EmbeddingSet:
             "Has it been embedded yet?",
         )
     return metadata
+
+
+@router.post("/{video_id}/index", response_model=IndexResult)
+def index_video(video_id: str) -> IndexResult:
+    """
+    Push a video's chunks + embeddings into the vector database,
+    making it searchable via /api/search.
+
+    Requires both chunking and embedding to have already run.
+    """
+    chunk_set = chunking_service.get_chunk_set(video_id)
+    if chunk_set is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No chunks found for video '{video_id}'. "
+            "Chunk it first via POST /api/videos/{video_id}/chunks.",
+        )
+    embedding_meta = embedding_service.get_embedding_metadata(video_id)
+    if embedding_meta is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No embeddings found for video '{video_id}'. "
+            "Embed it first via POST /api/videos/{video_id}/embeddings.",
+        )
+
+    try:
+        return retrieval_service.index_video(chunk_set, embedding_meta)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))

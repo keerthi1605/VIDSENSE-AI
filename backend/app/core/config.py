@@ -85,6 +85,14 @@ class Settings(BaseSettings):
     embedding_model_name: str = "all-MiniLM-L6-v2"
     embedding_device: str = "cpu"
 
+    # --- Vector database (ChromaDB) ---
+    # Persisted outside storage/ (matches this project's own .gitignore,
+    # set up back in Phase 1) since it's a database directory, not a
+    # per-video artifact folder.
+    chroma_persist_dir: Path = base_dir / "chroma_db"
+    chroma_collection_name: str = "video_chunks"
+    search_default_top_k: int = 5
+
     def ensure_storage_dirs(self) -> None:
         """Create all storage subdirectories if they don't already exist."""
         for d in (

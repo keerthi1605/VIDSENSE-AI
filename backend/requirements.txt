@@ -26,3 +26,6 @@ requests==2.34.2              # faster-whisper's utils.py imports this directly 
 # then install the rest normally.
 sentence-transformers==3.3.1  # wraps HuggingFace transformer models for
                                # sentence/paragraph embeddings
+
+# --- Phase 3 (vector database + semantic search) ---
+chromadb==1.5.9                # embedded/persistent vector database

@@ -110,3 +110,39 @@ class EmbeddingSet(BaseModel):
     chunk_count: int
     created_at: datetime
     chunk_ids: List[str]
+
+
+class IndexResult(BaseModel):
+    """Result of pushing a video's chunks+embeddings into the vector store."""
+
+    video_id: str
+    chunks_indexed: int
+    collection_name: str
+
+
+class SearchRequest(BaseModel):
+    query: str
+    top_k: Optional[int] = None
+    # Restrict search to one video's chunks. Omitted = search the whole
+    # library -- the more powerful default for a multi-video system.
+    video_id: Optional[str] = None
+
+
+class SearchResult(BaseModel):
+    """
+    One retrieved chunk, with everything needed to show and cite it:
+    where it's from (video_id), what it says (text), where in the
+    video it is (start_time/end_time), and how relevant it was (score).
+    """
+
+    video_id: str
+    chunk_id: str
+    text: str
+    start_time: float
+    end_time: float
+    score: float
+
+
+class SearchResponse(BaseModel):
+    query: str
+    results: List[SearchResult]

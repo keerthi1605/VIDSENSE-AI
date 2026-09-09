@@ -129,5 +129,30 @@ Each phase must leave the project runnable end-to-end before the next begins.
      scored 0.85 against the deadlock-conditions chunk vs. 0.08 against the
      binary-search chunk) — this is the same mechanism Phase 3 formalizes
      with ChromaDB instead of a hand-rolled loop.
-- No vector database, dedicated search endpoint, or LLM logic yet — that's
-  Phase 3.
+## Phase 3 — Vector Database + Semantic Search (complete)
+
+- `app/services/vector_store_service.py` — the ONLY module that imports
+  chromadb, keeping the vector DB swappable (e.g. to FAISS) without touching
+  anything above it. Uses a `PersistentClient` (local folder, no server
+  process), a collection explicitly configured for `hnsw:space: cosine`
+  (Chroma defaults to squared-L2, which would silently rank differently than
+  the cosine similarity validated since Phase 2), and `upsert` (not `add`)
+  for idempotent re-indexing. Telemetry disabled.
+- `app/services/retrieval_service.py` — domain-level `index_video()` (push
+  chunks+embeddings into the vector store, after verifying chunk_ids and
+  embedding chunk_ids actually align) and `search()` (embed query -> vector
+  store query -> shaped `SearchResult`s, `score = 1 - distance` so "higher is
+  better" everywhere).
+- `POST /api/videos/{video_id}/index` — index a video's chunks+embeddings
+- `GET`/`POST /api/search` — semantic search, optionally filtered to one
+  `video_id`, returning `{video_id, chunk_id, text, start_time, end_time,
+  score}` per result. No LLM involved — every result is directly traceable
+  to an exact place in a video, nothing generated.
+- Verified on real Whisper output through the full HTTP pipeline (upload ->
+  transcribe -> chunk -> embed -> index -> search) on a two-topic lecture:
+  a deadlock-conditions query correctly ranked the deadlock-conditions chunk
+  first (score 0.80) over the binary-search chunk (0.50); a binary-search
+  query correctly ranked the binary-search chunks first; the `video_id`
+  filter correctly restricted results to one video, including returning an
+  empty (not erroring) result set for a video with no indexed chunks.
+- No LLM / answer-generation logic yet — that's Phase 4.

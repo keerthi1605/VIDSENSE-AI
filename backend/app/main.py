@@ -10,6 +10,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from app.api.search import router as search_router
 from app.api.video import router as video_router
 from app.core.config import settings
 from app.core.logging import configure_logging, get_logger
@@ -35,6 +36,7 @@ app = FastAPI(
 )
 
 app.include_router(video_router)
+app.include_router(search_router)
 
 
 @app.get("/health", tags=["system"])

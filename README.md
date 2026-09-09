@@ -13,7 +13,7 @@ before the next begins — see [`docs/architecture.md`](docs/architecture.md) fo
 
 - [x] Phase 1 — Video upload + Whisper transcription — **complete**
 - [x] Phase 2 — Transcript chunking + text embeddings — **complete**
-- [ ] Phase 3 — Vector database + semantic search
+- [x] Phase 3 — Vector database + semantic search — **complete**
 - [ ] Phase 4 — RAG question answering
 - [ ] Phase 5 — Visual understanding (frame extraction + CLIP)
 - [ ] Phase 6 — Multimodal retrieval
@@ -62,7 +62,7 @@ Then check:
 curl http://127.0.0.1:8000/health
 ```
 
-## Phase 1 API
+## API (Phases 1–3): upload to searchable
 
 ```bash
 # 1. Upload a video, note the returned video_id
@@ -89,6 +89,16 @@ curl -X POST http://127.0.0.1:8000/api/videos/<video_id>/embeddings
 # 7. Fetch embedding metadata (model, dimension, chunk count -- not the
 #    raw vectors themselves; those live in storage/embeddings/*.npy)
 curl http://127.0.0.1:8000/api/videos/<video_id>/embeddings
+
+# 8. Push the chunks + embeddings into the vector database
+curl -X POST http://127.0.0.1:8000/api/videos/<video_id>/index
+
+# 9. Semantic search -- across all indexed videos, or one via video_id
+curl -X POST http://127.0.0.1:8000/api/search \
+  -H "Content-Type: application/json" \
+  -d '{"query": "explain deadlock prevention", "top_k": 5}'
+
+curl -G http://127.0.0.1:8000/api/search --data-urlencode "query=binary search"
 ```
 
 ## Repository structure
