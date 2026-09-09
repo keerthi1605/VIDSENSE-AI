@@ -77,6 +77,14 @@ class Settings(BaseSettings):
     # both chunks' embeddings.
     chunk_overlap_segments: int = 1
 
+    # --- Text embeddings (Sentence-Transformers) ---
+    # A small (384-dim), fast, general-purpose model -- the right
+    # tradeoff for CPU-only inference on this machine. Swappable to a
+    # larger model (e.g. "all-mpnet-base-v2") via .env once retrieval
+    # quality can actually be measured (Phase 10).
+    embedding_model_name: str = "all-MiniLM-L6-v2"
+    embedding_device: str = "cpu"
+
     def ensure_storage_dirs(self) -> None:
         """Create all storage subdirectories if they don't already exist."""
         for d in (

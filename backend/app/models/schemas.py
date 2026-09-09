@@ -90,3 +90,23 @@ class ChunkSet(BaseModel):
     chunk_target_words: int
     chunk_overlap_segments: int
     chunks: List[Chunk]
+
+
+class EmbeddingSet(BaseModel):
+    """
+    Metadata describing a video's stored embedding vectors.
+
+    Deliberately does NOT include the vectors themselves -- returning
+    e.g. 150 x 384 floats over HTTP is both large and not actually
+    useful to a client; the vectors live in a `.npy` file on disk and
+    are loaded directly by retrieval code (Phase 3), not fetched via
+    this API. `chunk_ids[i]` names which chunk row `i` of that array
+    corresponds to.
+    """
+
+    video_id: str
+    model_name: str
+    dimension: int
+    chunk_count: int
+    created_at: datetime
+    chunk_ids: List[str]

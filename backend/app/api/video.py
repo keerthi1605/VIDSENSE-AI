@@ -7,8 +7,14 @@ return its result. No business logic lives here.
 
 from fastapi import APIRouter, File, HTTPException, UploadFile
 
-from app.models.schemas import ChunkSet, Transcript, TranscribeRequest, VideoMetadata
-from app.services import audio_service, chunking_service, transcription_service, video_service
+from app.models.schemas import ChunkSet, EmbeddingSet, Transcript, TranscribeRequest, VideoMetadata
+from app.services import (
+    audio_service,
+    chunking_service,
+    embedding_service,
+    transcription_service,
+    video_service,
+)
 
 router = APIRouter(prefix="/api/videos", tags=["videos"])
 
@@ -98,3 +104,39 @@ def get_chunks(video_id: str) -> ChunkSet:
             "Has it been chunked yet?",
         )
     return chunk_set
+
+
+@router.post("/{video_id}/embeddings", response_model=EmbeddingSet)
+def embed_video(video_id: str) -> EmbeddingSet:
+    """
+    Generate and store text embeddings for a video's chunks.
+
+    Requires chunking to have already run. Sync `def` for the same
+    reason as /transcribe: model loading + encoding is CPU-bound work
+    that shouldn't block the event loop.
+    """
+    chunk_set = chunking_service.get_chunk_set(video_id)
+    if chunk_set is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No chunks found for video '{video_id}'. "
+            "Chunk it first via POST /api/videos/{video_id}/chunks.",
+        )
+    return embedding_service.embed_and_save(chunk_set)
+
+
+@router.get("/{video_id}/embeddings", response_model=EmbeddingSet)
+def get_embeddings(video_id: str) -> EmbeddingSet:
+    """
+    Fetch embedding metadata for a video (model name, dimension, chunk
+    count) -- NOT the raw vectors themselves; see EmbeddingSet's
+    docstring for why.
+    """
+    metadata = embedding_service.get_embedding_metadata(video_id)
+    if metadata is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No embeddings found for video '{video_id}'. "
+            "Has it been embedded yet?",
+        )
+    return metadata

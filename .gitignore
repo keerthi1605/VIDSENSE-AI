@@ -34,6 +34,11 @@ backend/storage/chunks/*
 backend/chroma_db/
 .cache/
 
+# --- Ad-hoc manual server runs (see docs) ---
+backend/uvicorn_out.log
+backend/uvicorn_err.log
+backend/uvicorn.pid
+
 # --- OS / editor ---
 .DS_Store
 Thumbs.db

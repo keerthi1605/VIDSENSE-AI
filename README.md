@@ -12,7 +12,7 @@ Being built incrementally, phase by phase. Each phase is left in a stable, worki
 before the next begins — see [`docs/architecture.md`](docs/architecture.md) for the full roadmap.
 
 - [x] Phase 1 — Video upload + Whisper transcription — **complete**
-- [ ] Phase 2 — Transcript chunking + text embeddings — **Step 1 (chunking) done, Step 2 (embeddings) next**
+- [x] Phase 2 — Transcript chunking + text embeddings — **complete**
 - [ ] Phase 3 — Vector database + semantic search
 - [ ] Phase 4 — RAG question answering
 - [ ] Phase 5 — Visual understanding (frame extraction + CLIP)
@@ -47,6 +47,10 @@ machine is a config change, not a code change.
 cd backend
 python -m venv venv
 venv\Scripts\activate        # Windows
+# CPU-only torch build first -- much smaller download than the default
+# (which bundles an unused CUDA runtime); this project runs all AI
+# inference on CPU by design (see Hardware note above).
+pip install torch --index-url https://download.pytorch.org/whl/cpu
 pip install -r requirements.txt
 cp .env.example .env
 uvicorn app.main:app --reload
@@ -78,6 +82,13 @@ curl -X POST http://127.0.0.1:8000/api/videos/<video_id>/chunks
 
 # 5. Fetch the chunk set any time after
 curl http://127.0.0.1:8000/api/videos/<video_id>/chunks
+
+# 6. Generate embeddings for the chunks
+curl -X POST http://127.0.0.1:8000/api/videos/<video_id>/embeddings
+
+# 7. Fetch embedding metadata (model, dimension, chunk count -- not the
+#    raw vectors themselves; those live in storage/embeddings/*.npy)
+curl http://127.0.0.1:8000/api/videos/<video_id>/embeddings
 ```
 
 ## Repository structure

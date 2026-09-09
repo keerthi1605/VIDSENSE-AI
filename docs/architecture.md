@@ -107,5 +107,27 @@ Each phase must leave the project runnable end-to-end before the next begins.
   lowered word target, chunk boundaries landed sensibly at the topic shift,
   and overlap was visibly preserving boundary-spanning sentences across
   adjacent chunks.
-- No embeddings, vector search, or LLM logic yet — embeddings are Phase 2,
-  Step 2.
+
+### Phase 2, Step 2 — Text embeddings (Phase 2 complete)
+
+- `app/services/embedding_service.py` — Sentence-Transformers
+  (`all-MiniLM-L6-v2`, 384-dim, CPU) as a lazy-loaded singleton, same pattern
+  as the Whisper model. `embed_texts()` produces L2-normalized vectors;
+  `cosine_similarity()` is a small standalone utility.
+- Vectors persisted as compact binary `.npy` (not JSON — ~230KB vs. several x
+  larger for 150 chunks as a float JSON array), with an `EmbeddingSet` JSON
+  metadata sidecar (model name, dimension, chunk_ids in row order). Raw
+  vectors are deliberately never returned over the API.
+- `POST/GET /api/videos/{video_id}/embeddings`
+- Verified two ways:
+  1. A real-model unit test: two paraphrased sentences score higher cosine
+     similarity than an unrelated one (not just trusting the library).
+  2. A manual end-to-end script: chunked + embedded a real two-topic
+     transcript, then hand-computed cosine similarity between two queries
+     and all chunks. Both queries correctly ranked their matching-topic
+     chunks far above the unrelated ones (e.g. the deadlock-conditions query
+     scored 0.85 against the deadlock-conditions chunk vs. 0.08 against the
+     binary-search chunk) — this is the same mechanism Phase 3 formalizes
+     with ChromaDB instead of a hand-rolled loop.
+- No vector database, dedicated search endpoint, or LLM logic yet — that's
+  Phase 3.
