@@ -59,6 +59,12 @@ class Settings(BaseSettings):
     whisper_device: str = "cpu"
     whisper_compute_type: str = "int8"
 
+    # --- Audio extraction (FFmpeg) ---
+    # Bare command name: resolved via PATH. Override in .env with a full
+    # path if ffmpeg isn't on PATH on a given machine.
+    ffmpeg_binary: str = "ffmpeg"
+    audio_sample_rate_hz: int = 16000  # Whisper's expected input rate
+
     def ensure_storage_dirs(self) -> None:
         """Create all storage subdirectories if they don't already exist."""
         for d in (

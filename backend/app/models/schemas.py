@@ -10,7 +10,7 @@ response model will likely diverge and we'll split them.
 """
 
 from datetime import datetime
-from typing import Optional
+from typing import List, Optional
 
 from pydantic import BaseModel
 
@@ -27,3 +27,32 @@ class VideoMetadata(BaseModel):
     # (UPLOADED/PROCESSING_AUDIO/TRANSCRIBING/INDEXING/READY/FAILED)
     # once background processing exists (Phase 9).
     status: str = "uploaded"
+
+
+class TranscribeRequest(BaseModel):
+    video_id: str
+
+
+class TranscriptSegment(BaseModel):
+    """
+    One chunk of spoken text with its exact position in the source video.
+
+    start_time/end_time are in seconds, as floats (Whisper's native
+    unit). Every later phase (chunking, embedding, retrieval, RAG
+    citations, frontend "jump to video") depends on these surviving
+    unchanged -- this is the load-bearing field of the whole project.
+    """
+
+    segment_id: int
+    start_time: float
+    end_time: float
+    text: str
+
+
+class Transcript(BaseModel):
+    video_id: str
+    language: str
+    duration_seconds: float
+    model_size: str
+    created_at: datetime
+    segments: List[TranscriptSegment]

@@ -11,7 +11,7 @@ relevant moment, and answers with a timestamp you can jump to.
 Being built incrementally, phase by phase. Each phase is left in a stable, working state
 before the next begins — see [`docs/architecture.md`](docs/architecture.md) for the full roadmap.
 
-- [x] Phase 1 — Video upload + Whisper transcription — **Step 2 (video upload) done, Step 3 (transcription) next**
+- [x] Phase 1 — Video upload + Whisper transcription — **complete**
 - [ ] Phase 2 — Transcript chunking + text embeddings
 - [ ] Phase 3 — Vector database + semantic search
 - [ ] Phase 4 — RAG question answering
@@ -56,6 +56,22 @@ Then check:
 
 ```bash
 curl http://127.0.0.1:8000/health
+```
+
+## Phase 1 API
+
+```bash
+# 1. Upload a video, note the returned video_id
+curl -X POST http://127.0.0.1:8000/api/videos/upload -F "file=@lecture.mp4"
+
+# 2. Transcribe it (first call downloads+loads the Whisper model, ~1-2 min;
+#    later calls in the same running process take a few seconds)
+curl -X POST http://127.0.0.1:8000/api/videos/transcribe \
+  -H "Content-Type: application/json" \
+  -d '{"video_id": "<video_id from step 1>"}'
+
+# 3. Fetch the transcript any time after
+curl http://127.0.0.1:8000/api/videos/<video_id>/transcript
 ```
 
 ## Repository structure

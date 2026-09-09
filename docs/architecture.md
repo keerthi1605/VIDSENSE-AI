@@ -69,7 +69,7 @@ Each phase must leave the project runnable end-to-end before the next begins.
 - **No fake AI** — every library/technology added must solve a real problem in the
   current phase. Nothing is added "because it's popular."
 
-## Current state (Phase 1, Step 2)
+## Current state (Phase 1, Step 3 — Phase 1 complete)
 
 - FastAPI app skeleton (`backend/app/main.py`) with a `GET /health` endpoint.
 - Centralized settings (`backend/app/core/config.py`) covering storage paths and
@@ -81,5 +81,16 @@ Each phase must leave the project runnable end-to-end before the next begins.
   under a generated `video_id` (never the client-supplied filename), enforcing
   the configured size cap mid-stream. Persists a JSON metadata sidecar
   (`storage/videos/{video_id}.json`) alongside the video file.
-- No audio extraction, transcription, chunking, retrieval, or LLM logic yet —
-  those are Phase 1 Step 3 onward.
+- `POST /api/videos/transcribe` — extracts mono 16kHz WAV audio via FFmpeg
+  (`app/services/audio_service.py`), then runs Faster-Whisper transcription
+  (`app/services/transcription_service.py`), producing timestamped segments
+  persisted to `storage/transcripts/{video_id}.json`. Synchronous (blocks the
+  request) by design for Phase 1; runs on a worker thread so it doesn't stall
+  the event loop. The Whisper model itself is a lazy-loaded singleton, loaded
+  once per process rather than per request.
+- `GET /api/videos/{video_id}/transcript` — fetches a saved transcript.
+- Verified end-to-end with a real synthesized-speech test video: accurate
+  transcription with correct timestamps; first transcription ~2 minutes
+  (includes one-time model download + load), subsequent transcriptions in the
+  same process ~2.4 seconds.
+- No chunking, embeddings, vector search, or LLM logic yet — that's Phase 2.

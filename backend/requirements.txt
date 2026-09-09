@@ -12,7 +12,9 @@ httpx==0.28.1          # required by fastapi.testclient.TestClient
 # --- Phase 1: Step 2 (video upload) ---
 python-multipart==0.0.19      # required by FastAPI for multipart file uploads
 
-# --- Phase 1: Step 3+ (audio extraction, transcription) ---
-# Uncommented as each step is implemented, so `pip install -r requirements.txt`
-# always matches what the current phase actually needs.
-# faster-whisper==1.1.0         # speech-to-text transcription (CPU/int8 on this machine)
+# --- Phase 1: Step 3 (audio extraction, transcription) ---
+# Note: FFmpeg itself is a system binary (not a pip package) -- confirmed
+# already installed and on PATH on this machine.
+faster-whisper==1.1.0         # speech-to-text transcription (CPU/int8 on this machine)
+requests==2.34.2              # faster-whisper's utils.py imports this directly but
+                               # doesn't always pull it in transitively -- pinned explicitly

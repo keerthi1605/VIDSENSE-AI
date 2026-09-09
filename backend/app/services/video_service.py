@@ -124,3 +124,27 @@ def get_video_metadata(video_id: str) -> VideoMetadata:
         raise HTTPException(status_code=404, detail=f"Video '{video_id}' not found.")
     data = json.loads(path.read_text(encoding="utf-8"))
     return VideoMetadata(**data)
+
+
+def get_video_file_path(video_id: str) -> Path:
+    """Resolve a video_id to its stored file path on disk, or raise 404."""
+    metadata = get_video_metadata(video_id)
+    path = settings.videos_dir / metadata.stored_filename
+    if not path.exists():
+        # Metadata exists but the file is gone -- treat as not found
+        # rather than silently proceeding with a missing file.
+        raise HTTPException(
+            status_code=404,
+            detail=f"Video file for '{video_id}' is missing from storage.",
+        )
+    return path
+
+
+def update_video_status(video_id: str, status: str) -> VideoMetadata:
+    """Update and persist a video's processing status."""
+    metadata = get_video_metadata(video_id)
+    metadata.status = status
+    _metadata_path(video_id).write_text(
+        metadata.model_dump_json(indent=2), encoding="utf-8"
+    )
+    return metadata
