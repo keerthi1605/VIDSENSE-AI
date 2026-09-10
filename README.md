@@ -14,7 +14,7 @@ before the next begins — see [`docs/architecture.md`](docs/architecture.md) fo
 - [x] Phase 1 — Video upload + Whisper transcription — **complete**
 - [x] Phase 2 — Transcript chunking + text embeddings — **complete**
 - [x] Phase 3 — Vector database + semantic search — **complete**
-- [ ] Phase 4 — RAG question answering
+- [x] Phase 4 — RAG question answering — **complete**
 - [ ] Phase 5 — Visual understanding (frame extraction + CLIP)
 - [ ] Phase 6 — Multimodal retrieval
 - [ ] Phase 7 — Timestamp-aware answers
@@ -31,7 +31,8 @@ before the next begins — see [`docs/architecture.md`](docs/architecture.md) fo
 - **Speech-to-text:** Faster-Whisper (CPU/int8 — see hardware note below)
 - **Embeddings:** Sentence-Transformers (text), CLIP (visual, added Phase 5)
 - **Vector DB:** ChromaDB
-- **LLM:** provider-agnostic by design (local via Ollama, or a swappable API)
+- **LLM:** provider-agnostic by design (`app/services/llm_service.py`); currently
+  Ollama running `qwen2.5:3b` locally (CPU-forced — see Hardware note)
 - **Frontend:** React (added Phase 8)
 
 ## Hardware note
@@ -40,6 +41,32 @@ Developed on a machine with an old/low-VRAM GPU (2GB, pre-CUDA-11 driver), so al
 inference defaults to **CPU**, using smaller/quantized models. This is reflected in
 `backend/app/core/config.py` and `backend/.env.example`. Swapping to GPU on a better
 machine is a config change, not a code change.
+
+**Important — Ollama on this GPU:** Ollama's default backend probes for a usable GPU
+via Vulkan and finds the GeForce MX230, but that GPU **does not support 16-bit
+storage**, which crashes `llama-server` (`ggml_vulkan: device Vulkan0 does not support
+16-bit storage`) on every generation request. The fix is forcing Ollama onto its CPU
+backend:
+
+```powershell
+[System.Environment]::SetEnvironmentVariable("OLLAMA_LLM_LIBRARY", "cpu", "User")
+```
+
+Set this once, then restart the Ollama app/service (log out/in, or restart the
+process) so it takes effect. Without it, `/api/chat` will return a 503 the moment
+Ollama actually tries to generate a response.
+
+## Setting up Ollama (Phase 4)
+
+```powershell
+winget install --id Ollama.Ollama -e
+# See the GPU note above BEFORE first use on this hardware.
+ollama pull qwen2.5:3b
+```
+
+Ollama runs as a background service listening on `http://localhost:11434` (the
+default `OLLAMA_BASE_URL` in `.env.example`). Confirm it's up with
+`ollama list` (should show `qwen2.5:3b`) or `curl http://localhost:11434/api/tags`.
 
 ## Running the backend (Phase 1)
 
@@ -62,7 +89,7 @@ Then check:
 curl http://127.0.0.1:8000/health
 ```
 
-## API (Phases 1–3): upload to searchable
+## API (Phases 1–4): upload to answered question
 
 ```bash
 # 1. Upload a video, note the returned video_id
@@ -99,6 +126,11 @@ curl -X POST http://127.0.0.1:8000/api/search \
   -d '{"query": "explain deadlock prevention", "top_k": 5}'
 
 curl -G http://127.0.0.1:8000/api/search --data-urlencode "query=binary search"
+
+# 10. Ask a question -- retrieval + LLM answer + exact-timestamp sources
+curl -X POST http://127.0.0.1:8000/api/chat \
+  -H "Content-Type: application/json" \
+  -d '{"query": "What are the four necessary conditions for deadlock?"}'
 ```
 
 ## Repository structure

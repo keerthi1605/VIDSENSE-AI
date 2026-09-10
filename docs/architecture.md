@@ -156,3 +156,51 @@ Each phase must leave the project runnable end-to-end before the next begins.
   filter correctly restricted results to one video, including returning an
   empty (not erroring) result set for a video with no indexed chunks.
 - No LLM / answer-generation logic yet — that's Phase 4.
+
+## Phase 4 — RAG Question Answering (complete)
+
+- `app/services/llm_service.py` — the LLM provider abstraction: an `LLMProvider`
+  ABC with one method, `generate(prompt) -> str`. `OllamaProvider` is the only
+  implementation today, calling a local Ollama server's `/api/generate` HTTP
+  endpoint. `get_llm_provider()` is the single factory function everything else
+  calls — swapping to a cloud provider later means adding one class and one
+  branch here, not touching rag_service or the API layer.
+- `app/services/rag_service.py` — owns the prompt template and the RAG
+  orchestration: `search()` for context -> build a prompt from the retrieved
+  chunks -> `generate()` -> attach sources. **Sources are built directly from
+  the retrieved `SearchResult`s, never parsed out of the LLM's own text** — a
+  3B local model asked to also emit structured citations (e.g. JSON) is
+  unreliable, so the model's only job is the natural-language answer; exact
+  timestamps come from data already trusted, not from hoping the model gets
+  a citation format right.
+- `has_sufficient_context` is a deterministic check (did retrieval return any
+  chunks at all), not a parse of whether the LLM's own answer claims it could
+  or couldn't answer. The prompt instructs the model to say so itself when
+  the excerpts are insufficient — a real behavior, just not yet fed back into
+  this boolean, since reliably parsing free text from a small local model is
+  its own source of bugs.
+- `POST /api/chat` — `{query, top_k?, video_id?}` -> `{query, answer, sources,
+  has_sufficient_context}`. Returns 503 (not 500) when Ollama is unreachable
+  or times out, with an actionable message.
+- Model choice: `qwen2.5:3b` via Ollama, chosen after checking this machine's
+  actual hardware (8GB total RAM, no usable GPU) — a 3B instruction-tuned
+  model is close to the practical ceiling for reliable CPU inference here.
+- **Hardware-specific fix required**: Ollama's default backend probes for a
+  GPU via Vulkan and finds the GeForce MX230, but that GPU doesn't support
+  16-bit storage, which crashes `llama-server` on every generation call.
+  Fixed by setting `OLLAMA_LLM_LIBRARY=cpu` (persisted at the user
+  environment level) to force Ollama onto its CPU backend. Documented in
+  the README since it's a one-time, easy-to-miss setup step for this exact
+  hardware.
+- Verified end-to-end on a live server with a real two-topic lecture (indexed
+  as 6 chunks): a deadlock-conditions question correctly retrieved and cited
+  the deadlock chunk (score 0.79) and produced an accurate, non-hallucinated
+  answer; a binary-search question did the same for the binary-search chunk
+  (score 0.78) while ranking the deadlock chunks near the bottom (0.09-0.17);
+  a query against a nonexistent `video_id` correctly short-circuited to the
+  deterministic "not enough information" response without calling the LLM;
+  killing the Ollama process and retrying correctly returned a 503 with a
+  clear message, then recovered once Ollama was restarted.
+- No conversation memory/multi-turn chat — out of scope for this phase's
+  "retrieval-grounded single-turn answering" goal; a real feature to add
+  later, not built here to avoid scope creep.

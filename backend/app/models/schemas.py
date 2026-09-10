@@ -146,3 +146,36 @@ class SearchResult(BaseModel):
 class SearchResponse(BaseModel):
     query: str
     results: List[SearchResult]
+
+
+class ChatRequest(BaseModel):
+    query: str
+    top_k: Optional[int] = None
+    video_id: Optional[str] = None
+
+
+class SourceRef(BaseModel):
+    """
+    A citation: exactly which chunk (and thus which moment in which
+    video) informed the answer. Built directly from retrieval results,
+    never parsed out of the LLM's own text -- so a timestamp shown to
+    the user is always a real, exact chunk boundary, never something
+    the model could get wrong or invent.
+    """
+
+    video_id: str
+    chunk_id: str
+    start_time: float
+    end_time: float
+    score: float
+
+
+class ChatResponse(BaseModel):
+    query: str
+    answer: str
+    sources: List[SourceRef]
+    # False when retrieval found nothing at all to answer from -- lets
+    # a client distinguish "the model tried and covered this" from
+    # "there was nothing to work with in the first place" without
+    # parsing the answer text.
+    has_sufficient_context: bool

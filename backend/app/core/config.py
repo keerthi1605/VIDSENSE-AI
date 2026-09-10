@@ -93,6 +93,22 @@ class Settings(BaseSettings):
     chroma_collection_name: str = "video_chunks"
     search_default_top_k: int = 5
 
+    # --- LLM (RAG answer generation) ---
+    # "llm_provider" is the actual swap point: llm_service.py picks an
+    # implementation based on this string. Only "ollama" exists today,
+    # but a future "anthropic"/"openai" provider is a new branch there,
+    # not a rewrite -- this field is what makes that a config change.
+    llm_provider: str = "ollama"
+    # A small (~2GB), CPU-runnable instruction-tuned model -- chosen for
+    # this machine's 8GB total RAM, shared with everything else already
+    # running (torch, sentence-transformers, faster-whisper). A larger
+    # model would be higher quality but risks starving the machine.
+    ollama_base_url: str = "http://localhost:11434"
+    ollama_model: str = "qwen2.5:3b"
+    llm_request_timeout_seconds: int = 120
+    # How many top search results get passed to the LLM as context.
+    rag_context_chunks: int = 5
+
     def ensure_storage_dirs(self) -> None:
         """Create all storage subdirectories if they don't already exist."""
         for d in (

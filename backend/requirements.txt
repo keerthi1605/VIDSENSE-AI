@@ -29,3 +29,9 @@ sentence-transformers==3.3.1  # wraps HuggingFace transformer models for
 
 # --- Phase 3 (vector database + semantic search) ---
 chromadb==1.5.9                # embedded/persistent vector database
+
+# --- Phase 4 (RAG question answering) ---
+# No new pip package here: llm_service.py talks to a local Ollama server
+# over plain HTTP using `requests`, already pinned above. Ollama itself
+# is a separate system install -- see README for setup instructions and
+# `ollama pull <model>` to fetch the model named in .env.
