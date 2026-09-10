@@ -109,6 +109,21 @@ class Settings(BaseSettings):
     # How many top search results get passed to the LLM as context.
     rag_context_chunks: int = 5
 
+    # --- Frame extraction (Phase 5, OpenCV) ---
+    # Ceiling on sampling frequency: one candidate frame every N seconds.
+    # Lecture visuals (slides, code, diagrams) rarely change faster than
+    # this, so sampling more often would mostly just find duplicates.
+    frame_sample_interval_seconds: float = 5.0
+    # A candidate frame is compared to the last SAVED frame via mean
+    # absolute pixel difference on a small downsampled grayscale copy
+    # (cheap to compute). Below this threshold, it's treated as a
+    # duplicate (same slide still on screen) and skipped. This is a
+    # starting heuristic -- worth tuning once retrieval quality can
+    # actually be measured (Phase 10), not derived from any formal study.
+    frame_diff_threshold: float = 10.0
+    frame_diff_downsample_size: tuple[int, int] = (64, 64)
+    frame_jpeg_quality: int = 85
+
     def ensure_storage_dirs(self) -> None:
         """Create all storage subdirectories if they don't already exist."""
         for d in (

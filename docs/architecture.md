@@ -204,3 +204,40 @@ Each phase must leave the project runnable end-to-end before the next begins.
 - No conversation memory/multi-turn chat — out of scope for this phase's
   "retrieval-grounded single-turn answering" goal; a real feature to add
   later, not built here to avoid scope creep.
+
+## Phase 5, Step 1 — Frame Extraction
+
+- `app/services/frame_service.py` — samples frames via OpenCV, not FFmpeg
+  (comparing pixel data to detect duplicates needs actual arrays in hand,
+  not a second read-back pass over files FFmpeg already wrote). Two-part
+  sampling strategy:
+  1. Fixed-interval cadence (`frame_sample_interval_seconds`, default 5s)
+     bounds how often a frame is even considered.
+  2. Near-duplicate skip: each candidate is compared to the last SAVED
+     frame via mean absolute pixel difference on a small downsampled
+     grayscale copy; below `frame_diff_threshold` (default 10.0, a
+     starting heuristic) it's treated as the same slide/scene and skipped.
+  Uses `cap.grab()`/`cap.retrieve()` (not `cap.set(POS_FRAMES, ...)` seeking)
+  for sequential, codec-portable timestamps without decoding skipped frames.
+- `Frame`/`FrameSet` schemas — one manifest JSON per video
+  (`storage/frames/{video_id}/manifest.json`), images alongside it as
+  `frame_0000.jpg`, etc. Deliberately deviates from the master prompt's
+  example JSON (which shows `embedding` inline) — mirrors Phase 2's
+  established pattern of keeping vectors in a separate binary file, added
+  in Step 2 once frames themselves are verified.
+- `POST/GET /api/videos/{video_id}/frames`, plus
+  `GET /api/videos/{video_id}/frames/{frame_id}/image` to serve the actual
+  JPEG (useful for a frontend preview or manual inspection).
+- Verified two ways:
+  1. Synthetic videos with real, controlled pixel content: a static-color
+     video produces exactly 1 saved frame (everything else correctly
+     identified as duplicate); a two-scene video (color change at t=5s)
+     produces exactly 2 frames — proof the duplicate check discriminates
+     real content changes from a static scene, not just an assumption.
+  2. Live end-to-end: a 3-segment color-change video (18s, cuts at 6s/12s)
+     through the real upload -> extract-frames API produced exactly 3
+     frames at t=0/10/15s (the t=5 candidate correctly skipped as a
+     duplicate of t=0); downloaded and visually confirmed the served JPEG
+     matched the expected color for its timestamp.
+- No visual embeddings yet (CLIP) — that's Step 2. Frames aren't searchable
+  yet, just extracted and inspectable.

@@ -15,7 +15,7 @@ before the next begins — see [`docs/architecture.md`](docs/architecture.md) fo
 - [x] Phase 2 — Transcript chunking + text embeddings — **complete**
 - [x] Phase 3 — Vector database + semantic search — **complete**
 - [x] Phase 4 — RAG question answering — **complete**
-- [ ] Phase 5 — Visual understanding (frame extraction + CLIP)
+- [ ] Phase 5 — Visual understanding (frame extraction + CLIP) — **Step 1 (frame extraction) done, Step 2 (CLIP embeddings) next**
 - [ ] Phase 6 — Multimodal retrieval
 - [ ] Phase 7 — Timestamp-aware answers
 - [ ] Phase 8 — Frontend
@@ -131,6 +131,13 @@ curl -G http://127.0.0.1:8000/api/search --data-urlencode "query=binary search"
 curl -X POST http://127.0.0.1:8000/api/chat \
   -H "Content-Type: application/json" \
   -d '{"query": "What are the four necessary conditions for deadlock?"}'
+
+# 11. Extract representative frames (fixed interval + near-duplicate skip)
+curl -X POST http://127.0.0.1:8000/api/videos/<video_id>/frames
+
+# 12. Fetch the frame manifest, or view one frame's actual image
+curl http://127.0.0.1:8000/api/videos/<video_id>/frames
+curl http://127.0.0.1:8000/api/videos/<video_id>/frames/<frame_id>/image -o frame.jpg
 ```
 
 ## Repository structure

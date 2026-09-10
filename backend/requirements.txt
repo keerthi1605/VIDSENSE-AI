@@ -35,3 +35,6 @@ chromadb==1.5.9                # embedded/persistent vector database
 # over plain HTTP using `requests`, already pinned above. Ollama itself
 # is a separate system install -- see README for setup instructions and
 # `ollama pull <model>` to fetch the model named in .env.
+
+# --- Phase 5: Step 1 (frame extraction) ---
+opencv-python==4.10.0.84       # frame sampling + pixel-diff duplicate detection

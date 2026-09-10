@@ -6,10 +6,12 @@ return its result. No business logic lives here.
 """
 
 from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi.responses import FileResponse
 
 from app.models.schemas import (
     ChunkSet,
     EmbeddingSet,
+    FrameSet,
     IndexResult,
     Transcript,
     TranscribeRequest,
@@ -19,6 +21,7 @@ from app.services import (
     audio_service,
     chunking_service,
     embedding_service,
+    frame_service,
     retrieval_service,
     transcription_service,
     video_service,
@@ -177,3 +180,34 @@ def index_video(video_id: str) -> IndexResult:
         return retrieval_service.index_video(chunk_set, embedding_meta)
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc))
+
+
+@router.post("/{video_id}/frames", response_model=FrameSet)
+def extract_frames(video_id: str) -> FrameSet:
+    """
+    Sample representative frames from a video (see frame_service for
+    the sampling strategy). Sync `def`: OpenCV decoding is CPU-bound.
+    """
+    video_path = video_service.get_video_file_path(video_id)
+    return frame_service.extract_frames(video_path, video_id)
+
+
+@router.get("/{video_id}/frames", response_model=FrameSet)
+def get_frames(video_id: str) -> FrameSet:
+    """Fetch a previously extracted frame set for a video."""
+    frame_set = frame_service.get_frame_set(video_id)
+    if frame_set is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No frames found for video '{video_id}'. "
+            "Has it been frame-extracted yet?",
+        )
+    return frame_set
+
+
+@router.get("/{video_id}/frames/{frame_id}/image")
+def get_frame_image(video_id: str, frame_id: str) -> FileResponse:
+    """Serve one extracted frame's actual JPEG image -- useful for a
+    frontend preview or manual inspection."""
+    image_path = frame_service.get_frame_image_path(video_id, frame_id)
+    return FileResponse(image_path, media_type="image/jpeg")

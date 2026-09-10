@@ -179,3 +179,33 @@ class ChatResponse(BaseModel):
     # "there was nothing to work with in the first place" without
     # parsing the answer text.
     has_sufficient_context: bool
+
+
+class Frame(BaseModel):
+    """
+    One sampled video frame -- a candidate that survived both the
+    fixed-interval sampling cadence AND the near-duplicate check (it
+    differs enough from the previously saved frame to be worth keeping).
+
+    timestamp is in seconds, same unit/precision convention as
+    TranscriptSegment/Chunk, so frame results can sit alongside text
+    results in a fused multimodal response (Phase 6) without unit
+    mismatches.
+    """
+
+    frame_id: str
+    video_id: str
+    frame_index: int
+    timestamp: float
+    image_path: str  # relative to storage/frames/{video_id}/
+
+
+class FrameSet(BaseModel):
+    """The full set of sampled frames for one video, plus the sampling
+    settings used to produce them (mirrors ChunkSet's role for text)."""
+
+    video_id: str
+    created_at: datetime
+    sample_interval_seconds: float
+    diff_threshold: float
+    frames: List[Frame]
