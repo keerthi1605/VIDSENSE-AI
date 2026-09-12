@@ -124,6 +124,18 @@ class Settings(BaseSettings):
     frame_diff_downsample_size: tuple[int, int] = (64, 64)
     frame_jpeg_quality: int = 85
 
+    # --- Visual embeddings (CLIP, Phase 5 Step 2) ---
+    # CLIP is the only real choice here, not one option among several: it
+    # jointly embeds images AND text into the SAME vector space, which is
+    # what makes "search frames by a text query" possible at all. This is
+    # a SEPARATE embedding space from embedding_model_name above (512-dim
+    # here vs. 384-dim there) -- the two are never compared to each other.
+    # clip-ViT-B-32 via sentence-transformers reuses the dependency already
+    # installed for text embeddings, same .encode() API for both images
+    # and text.
+    clip_model_name: str = "clip-ViT-B-32"
+    clip_device: str = "cpu"
+
     def ensure_storage_dirs(self) -> None:
         """Create all storage subdirectories if they don't already exist."""
         for d in (

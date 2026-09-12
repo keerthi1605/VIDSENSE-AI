@@ -241,3 +241,46 @@ Each phase must leave the project runnable end-to-end before the next begins.
      matched the expected color for its timestamp.
 - No visual embeddings yet (CLIP) — that's Step 2. Frames aren't searchable
   yet, just extracted and inspectable.
+
+## Phase 5, Step 2 — CLIP Visual Embeddings
+
+- `app/services/vision_service.py` — a separate file from
+  `embedding_service.py` on purpose (matches the master-prompt architecture
+  and keeps the two modalities' lazy-singleton models independent).
+  `clip-ViT-B-32` via sentence-transformers (already a dependency) — CLIP
+  is the only real option here, not one choice among several: it's the
+  only model that embeds images and text into the SAME vector space,
+  which is what makes "search frames by a text query" possible at all.
+  This is a completely separate 512-dim space from `embedding_model_name`'s
+  384-dim text-only space — the two are never compared to each other.
+- `embed_text_for_visual()` embeds a query into CLIP's space (for Phase 6's
+  visual search) using the exact same model/method as `embed_images()` —
+  included now, not deferred, because it's what makes the joint-space
+  property testable at all.
+- `FrameEmbeddingSet` schema + `.npy`/JSON sidecar storage
+  (`storage/embeddings/{video_id}_frames.{npy,json}`), same separation
+  principle as `EmbeddingSet`: vectors never returned raw over the API.
+- `POST/GET /api/videos/{video_id}/frame-embeddings`
+- Verified two ways:
+  1. A real-model test: two solid-color images (red, blue) and their
+     matching/mismatching text descriptions — the red image scores higher
+     against "a solid red image" than "a solid blue image," and vice
+     versa. Proof the joint space actually holds, not just an assumption
+     about what CLIP should do.
+  2. Live end-to-end + a manual "poor man's visual search": embedded a
+     real 3-segment color video's frames via the live API, then queried
+     CLIP's text encoder with "a dark navy blue background" / "a dark
+     green background" / "a dark maroon red background" against the
+     saved vectors — all three correctly ranked their matching-color
+     frame first (e.g. 0.33 vs ~0.25-0.26 for the other two), the same
+     mechanism Phase 6 will use for real multimodal retrieval.
+- **Operational note**: HuggingFace's `xet` transfer backend was
+  unreliable on this network during the ~600MB CLIP download (bandwidth
+  collapsed to a few KB/s with repeated retries after an initially normal
+  rate). Fixed by setting `HF_HUB_DISABLE_XET=1` to force the plain HTTP
+  downloader, which completed reliably. Documented in the README since
+  it'll recur for any large model download on this connection.
+- No vector-store indexing yet for frames — chunks index into ChromaDB
+  (Phase 3), but frame vectors are still file-only. That's Step 3, which
+  will also need to decide how a "video_frames" collection coexists with
+  the existing "video_chunks" one before Phase 6 can fuse both searches.

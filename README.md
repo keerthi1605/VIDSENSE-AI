@@ -15,7 +15,7 @@ before the next begins — see [`docs/architecture.md`](docs/architecture.md) fo
 - [x] Phase 2 — Transcript chunking + text embeddings — **complete**
 - [x] Phase 3 — Vector database + semantic search — **complete**
 - [x] Phase 4 — RAG question answering — **complete**
-- [ ] Phase 5 — Visual understanding (frame extraction + CLIP) — **Step 1 (frame extraction) done, Step 2 (CLIP embeddings) next**
+- [ ] Phase 5 — Visual understanding (frame extraction + CLIP) — **Steps 1-2 (frames + CLIP embeddings) done, Step 3 (index into vector DB) next**
 - [ ] Phase 6 — Multimodal retrieval
 - [ ] Phase 7 — Timestamp-aware answers
 - [ ] Phase 8 — Frontend
@@ -89,6 +89,18 @@ Then check:
 curl http://127.0.0.1:8000/health
 ```
 
+**If a HuggingFace model download hangs/crawls** (seen with `clip-ViT-B-32`,
+~600MB): HuggingFace's newer `xet` transfer backend was unreliable on this
+network -- bandwidth collapsed to a few KB/s with repeated retries. Force
+the plain HTTP downloader instead:
+
+```powershell
+$env:HF_HUB_DISABLE_XET = "1"
+```
+
+Set this before the first run that needs to download a new model (Whisper,
+Sentence-Transformers, CLIP); already-cached models are unaffected.
+
 ## API (Phases 1–4): upload to answered question
 
 ```bash
@@ -138,6 +150,13 @@ curl -X POST http://127.0.0.1:8000/api/videos/<video_id>/frames
 # 12. Fetch the frame manifest, or view one frame's actual image
 curl http://127.0.0.1:8000/api/videos/<video_id>/frames
 curl http://127.0.0.1:8000/api/videos/<video_id>/frames/<frame_id>/image -o frame.jpg
+
+# 13. Generate CLIP visual embeddings for the frames
+curl -X POST http://127.0.0.1:8000/api/videos/<video_id>/frame-embeddings
+
+# 14. Fetch frame-embedding metadata (model, dimension, frame count --
+#     not the raw vectors; those live in storage/embeddings/*_frames.npy)
+curl http://127.0.0.1:8000/api/videos/<video_id>/frame-embeddings
 ```
 
 ## Repository structure

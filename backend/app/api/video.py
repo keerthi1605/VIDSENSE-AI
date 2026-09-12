@@ -11,6 +11,7 @@ from fastapi.responses import FileResponse
 from app.models.schemas import (
     ChunkSet,
     EmbeddingSet,
+    FrameEmbeddingSet,
     FrameSet,
     IndexResult,
     Transcript,
@@ -25,6 +26,7 @@ from app.services import (
     retrieval_service,
     transcription_service,
     video_service,
+    vision_service,
 )
 
 router = APIRouter(prefix="/api/videos", tags=["videos"])
@@ -211,3 +213,35 @@ def get_frame_image(video_id: str, frame_id: str) -> FileResponse:
     frontend preview or manual inspection."""
     image_path = frame_service.get_frame_image_path(video_id, frame_id)
     return FileResponse(image_path, media_type="image/jpeg")
+
+
+@router.post("/{video_id}/frame-embeddings", response_model=FrameEmbeddingSet)
+def embed_frames(video_id: str) -> FrameEmbeddingSet:
+    """
+    Generate and store CLIP visual embeddings for a video's frames.
+
+    Requires frame extraction to have already run. Sync `def`: model
+    loading + encoding is CPU-bound.
+    """
+    frame_set = frame_service.get_frame_set(video_id)
+    if frame_set is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No frames found for video '{video_id}'. "
+            "Extract frames first via POST /api/videos/{video_id}/frames.",
+        )
+    return vision_service.embed_and_save_frames(frame_set)
+
+
+@router.get("/{video_id}/frame-embeddings", response_model=FrameEmbeddingSet)
+def get_frame_embeddings(video_id: str) -> FrameEmbeddingSet:
+    """Fetch CLIP frame-embedding metadata (model, dimension, frame
+    count) -- NOT the raw vectors; see FrameEmbeddingSet's docstring."""
+    metadata = vision_service.get_frame_embedding_metadata(video_id)
+    if metadata is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No frame embeddings found for video '{video_id}'. "
+            "Has it been frame-embedded yet?",
+        )
+    return metadata

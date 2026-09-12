@@ -38,3 +38,8 @@ chromadb==1.5.9                # embedded/persistent vector database
 
 # --- Phase 5: Step 1 (frame extraction) ---
 opencv-python==4.10.0.84       # frame sampling + pixel-diff duplicate detection
+
+# --- Phase 5: Step 2 (CLIP visual embeddings) ---
+# No new pip package: sentence-transformers (already installed) wraps
+# CLIP too. First use of clip-ViT-B-32 downloads ~600MB of model weights
+# (same lazy-load-on-first-use pattern as Whisper/MiniLM).

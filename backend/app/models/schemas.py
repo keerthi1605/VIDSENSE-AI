@@ -209,3 +209,22 @@ class FrameSet(BaseModel):
     sample_interval_seconds: float
     diff_threshold: float
     frames: List[Frame]
+
+
+class FrameEmbeddingSet(BaseModel):
+    """
+    Metadata describing a video's stored CLIP frame-embedding vectors.
+
+    Mirrors EmbeddingSet's role for text chunks, with the same
+    reasoning: vectors live in a `.npy` file, never returned raw over
+    the API. dimension is CLIP's (512), a completely different and
+    non-comparable space from EmbeddingSet's text dimension (384) --
+    the two are never mixed.
+    """
+
+    video_id: str
+    model_name: str
+    dimension: int
+    frame_count: int
+    created_at: datetime
+    frame_ids: List[str]
