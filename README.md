@@ -9,7 +9,10 @@ relevant moment, and answers with a timestamp you can jump to.
 ## Project status
 
 Being built incrementally, phase by phase. Each phase is left in a stable, working state
-before the next begins — see [`docs/architecture.md`](docs/architecture.md) for the full roadmap.
+before the next begins — see [`docs/architecture.md`](docs/architecture.md) for the full
+roadmap and [`docs/concepts.md`](docs/concepts.md) for the underlying concepts explained
+in depth (what each technology is, why it was chosen, alternatives, limitations — viva
+prep material).
 
 - [x] Phase 1 — Video upload + Whisper transcription — **complete**
 - [x] Phase 2 — Transcript chunking + text embeddings — **complete**
@@ -176,7 +179,8 @@ vidsense-ai/
 │   ├── requirements.txt
 │   └── .env.example
 ├── docs/
-│   └── architecture.md
+│   ├── architecture.md       # build log: what exists, per file, per phase
+│   └── concepts.md           # knowledge reference: the underlying ideas, in depth
 └── README.md
 ```
 
