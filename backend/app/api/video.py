@@ -12,6 +12,7 @@ from app.models.schemas import (
     ChunkSet,
     EmbeddingSet,
     FrameEmbeddingSet,
+    FrameIndexResult,
     FrameSet,
     IndexResult,
     Transcript,
@@ -245,3 +246,35 @@ def get_frame_embeddings(video_id: str) -> FrameEmbeddingSet:
             "Has it been frame-embedded yet?",
         )
     return metadata
+
+
+@router.post("/{video_id}/index-frames", response_model=FrameIndexResult)
+def index_video_frames(video_id: str) -> FrameIndexResult:
+    """
+    Push a video's frames + CLIP embeddings into the (separate) frames
+    vector database collection, making them searchable via
+    /api/search/visual.
+
+    Requires both frame extraction and frame embedding to have already
+    run. A separate endpoint from /index (text chunks) since the two
+    pipelines are independent -- a video can have one without the other.
+    """
+    frame_set = frame_service.get_frame_set(video_id)
+    if frame_set is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No frames found for video '{video_id}'. "
+            "Extract frames first via POST /api/videos/{video_id}/frames.",
+        )
+    frame_embedding_meta = vision_service.get_frame_embedding_metadata(video_id)
+    if frame_embedding_meta is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No frame embeddings found for video '{video_id}'. "
+            "Embed frames first via POST /api/videos/{video_id}/frame-embeddings.",
+        )
+
+    try:
+        return retrieval_service.index_video_frames(frame_set, frame_embedding_meta)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))

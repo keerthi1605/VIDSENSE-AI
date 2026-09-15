@@ -382,9 +382,11 @@ that measurably changes model behavior in practice.
 ## Phase 5 — Computer Vision & CLIP
 
 ### What we built
-`frame_service.py` (OpenCV sampling + duplicate-skip) and `vision_service.py` (CLIP
-embeddings). See
-[architecture.md](architecture.md#phase-5-step-1--frame-extraction).
+`frame_service.py` (OpenCV sampling + duplicate-skip), `vision_service.py` (CLIP
+embeddings), and `retrieval_service.search_frames()`/`index_video_frames()` (indexing
+frame vectors into a separate ChromaDB collection, `video_frames`, alongside the
+text-chunk one). See
+[architecture.md](architecture.md#phase-5-step-3--indexing-frames-into-the-vector-store-phase-5-complete).
 
 ### Why audio-only search isn't enough
 Whisper only knows what was *said*. Slides, code, diagrams, whiteboard content — often
@@ -435,6 +437,18 @@ CLIP's image embeddings — entirely separately from MiniLM-based chunk search. 
 will run both searches independently and fuse the two ranked lists with a weighted score
 — it cannot merge the raw vectors themselves.
 
+### Indexing frames: a second, independent vector-database collection
+Everything said about ChromaDB and HNSW in [Phase 3](#phase-3--vector-databases--semantic-search)
+applies again here, unchanged — the only new idea is that frame vectors get their **own**
+collection (`video_frames`), separate from the text-chunk collection (`video_chunks`).
+This isn't a stylistic choice: a Chroma collection is built around one fixed vector
+dimensionality, and 384-dim MiniLM vectors and 512-dim CLIP vectors could not physically
+share one even if we wanted them to — on top of the fact that, per the previous section,
+they're non-comparable spaces anyway. This is also why `vector_store_service.py` was
+refactored to take an explicit `collection_name` on every call rather than assuming a
+single global collection: the same low-level "talk to Chroma" code now serves two
+independent, differently-shaped indexes.
+
 ### Model choice: `clip-ViT-B-32`
 The base/32 ViT (Vision Transformer) CLIP checkpoint — the standard baseline, ~600MB,
 moderate compute cost. A larger variant (`ViT-L/14`) is more accurate but meaningfully
@@ -470,6 +484,11 @@ MiniLM — same `.encode()` API for both images and text, no new library.
   interval sampling?"* → nothing would *break*, but a long static slide would produce
   many redundant near-identical embeddings, wasting storage/compute without adding
   retrievable information.
+- *"Why two ChromaDB collections instead of one?"* → a collection has one fixed vector
+  dimensionality; 384-dim text and 512-dim frame vectors couldn't share one even ignoring
+  that they're non-comparable spaces. This is also why the vector-store code was
+  refactored to take an explicit collection name on every call instead of assuming a
+  single global collection.
 
 ---
 

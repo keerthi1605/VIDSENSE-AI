@@ -18,7 +18,7 @@ prep material).
 - [x] Phase 2 — Transcript chunking + text embeddings — **complete**
 - [x] Phase 3 — Vector database + semantic search — **complete**
 - [x] Phase 4 — RAG question answering — **complete**
-- [ ] Phase 5 — Visual understanding (frame extraction + CLIP) — **Steps 1-2 (frames + CLIP embeddings) done, Step 3 (index into vector DB) next**
+- [x] Phase 5 — Visual understanding (frame extraction + CLIP) — **complete**
 - [ ] Phase 6 — Multimodal retrieval
 - [ ] Phase 7 — Timestamp-aware answers
 - [ ] Phase 8 — Frontend
@@ -104,7 +104,7 @@ $env:HF_HUB_DISABLE_XET = "1"
 Set this before the first run that needs to download a new model (Whisper,
 Sentence-Transformers, CLIP); already-cached models are unaffected.
 
-## API (Phases 1–4): upload to answered question
+## API (Phases 1–5): upload to answered question, plus visual search
 
 ```bash
 # 1. Upload a video, note the returned video_id
@@ -160,6 +160,16 @@ curl -X POST http://127.0.0.1:8000/api/videos/<video_id>/frame-embeddings
 # 14. Fetch frame-embedding metadata (model, dimension, frame count --
 #     not the raw vectors; those live in storage/embeddings/*_frames.npy)
 curl http://127.0.0.1:8000/api/videos/<video_id>/frame-embeddings
+
+# 15. Push frame embeddings into the (separate) vector DB collection
+curl -X POST http://127.0.0.1:8000/api/videos/<video_id>/index-frames
+
+# 16. Visual search -- query text embedded via CLIP, matched against frames
+curl -X POST http://127.0.0.1:8000/api/search/visual \
+  -H "Content-Type: application/json" \
+  -d '{"query": "a slide with a diagram"}'
+
+curl -G http://127.0.0.1:8000/api/search/visual --data-urlencode "query=a whiteboard"
 ```
 
 ## Repository structure

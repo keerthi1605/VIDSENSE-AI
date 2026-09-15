@@ -284,3 +284,49 @@ Each phase must leave the project runnable end-to-end before the next begins.
   (Phase 3), but frame vectors are still file-only. That's Step 3, which
   will also need to decide how a "video_frames" collection coexists with
   the existing "video_chunks" one before Phase 6 can fuse both searches.
+
+## Phase 5, Step 3 — Indexing Frames into the Vector Store (Phase 5 complete)
+
+- `vector_store_service.py` **refactored to be collection-agnostic**:
+  `get_collection()`, `upsert()` (renamed from `upsert_chunks`), `query()`,
+  and `count()` all take an explicit `collection_name` now, and `query()`
+  returns generic `{id, document, metadata, score}` dicts instead of
+  chunk-specific fields. This module has no idea what a "chunk" or "frame"
+  is — that interpretation moved up into `retrieval_service.py`, split
+  into a text section and a visual section.
+- Frame vectors (512-dim, CLIP) live in a **separate** collection
+  (`video_frames`) from text chunks (384-dim, MiniLM, `video_chunks`) —
+  Chroma collections are single-dimension, and the two spaces are
+  non-comparable anyway (see `docs/concepts.md`).
+- `retrieval_service.index_video_frames()` / `search_frames()` — mirror
+  `index_video()`/`search()` exactly, with one critical difference:
+  `search_frames()` embeds the query via `vision_service.embed_text_for_visual()`
+  (CLIP's text encoder), never `embedding_service.embed_texts()` (MiniLM) —
+  covered by a dedicated test asserting MiniLM is never called.
+- `POST /api/videos/{video_id}/index-frames` — a separate endpoint from
+  `/index` (text), since a video can have one pipeline without the other.
+- `GET`/`POST /api/search/visual` — a standalone, unfused visual search
+  endpoint, deliberately built the same way Phase 3's `/api/search` was
+  built before Phase 4 added the LLM: prove each retrieval channel works
+  independently before Phase 6 fuses their two ranked lists.
+- Verified three ways:
+  1. Real-Chroma integration test (`test_visual_search_api.py`, mirrors
+     `test_search_api.py`'s structure): a fake-but-deterministic CLIP
+     model, real indexing + search through the actual HTTP endpoints,
+     plus an explicit test that indexing frames leaves the text
+     collection's count at zero (proof the two collections don't
+     cross-contaminate).
+  2. Live end-to-end with the REAL CLIP model: a real 3-segment
+     color-change video run through upload → frames → frame-embeddings →
+     index-frames → `/api/search/visual`. All three text queries ("navy
+     blue" / "dark green" / "maroon red") correctly ranked their
+     matching-color frame first via the actual production API path (not
+     just the earlier manual script) — e.g. 0.31 vs ~0.25 for navy,
+     0.33 vs ~0.24-0.26 for maroon.
+  3. Confirmed `/api/search` (text) returns empty after only frames were
+     indexed — the two collections are genuinely independent, not just
+     asserted to be.
+
+Phase 5 (frame extraction, CLIP embeddings, vector-store indexing) is now
+complete. The visual pipeline is a full parallel of the text pipeline
+(Phases 2+3), ready for Phase 6 to fuse both searches into one ranked list.

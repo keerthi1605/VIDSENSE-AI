@@ -228,3 +228,38 @@ class FrameEmbeddingSet(BaseModel):
     frame_count: int
     created_at: datetime
     frame_ids: List[str]
+
+
+class FrameIndexResult(BaseModel):
+    """Result of pushing a video's frames+CLIP embeddings into the
+    vector store (mirrors IndexResult for text chunks)."""
+
+    video_id: str
+    frames_indexed: int
+    collection_name: str
+
+
+class VisualSearchRequest(BaseModel):
+    query: str
+    top_k: Optional[int] = None
+    video_id: Optional[str] = None
+
+
+class FrameSearchResult(BaseModel):
+    """
+    One retrieved frame, with everything needed to show and cite it:
+    where it's from, when it occurs, and how relevant it was. No `text`
+    field -- unlike a chunk, a frame's "content" IS the image; see
+    image_path (relative to storage/frames/{video_id}/) to display it.
+    """
+
+    video_id: str
+    frame_id: str
+    timestamp: float
+    image_path: str
+    score: float
+
+
+class VisualSearchResponse(BaseModel):
+    query: str
+    results: List[FrameSearchResult]

@@ -91,6 +91,12 @@ class Settings(BaseSettings):
     # per-video artifact folder.
     chroma_persist_dir: Path = base_dir / "chroma_db"
     chroma_collection_name: str = "video_chunks"
+    # A SEPARATE collection for CLIP frame vectors (512-dim) -- Chroma
+    # collections are single-dimension, and text-chunk vectors (384-dim,
+    # MiniLM) and frame vectors are different, non-comparable spaces
+    # anyway (see docs/concepts.md), so they could never share one
+    # collection even if dimensions matched.
+    chroma_frames_collection_name: str = "video_frames"
     search_default_top_k: int = 5
 
     # --- LLM (RAG answer generation) ---

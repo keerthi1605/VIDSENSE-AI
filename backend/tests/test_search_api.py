@@ -64,7 +64,7 @@ def _setup(tmp_path, monkeypatch):
     monkeypatch.setattr(embedding_service, "get_embedding_model", lambda: FakeEmbeddingModel())
     monkeypatch.setattr(settings, "chroma_persist_dir", tmp_path / "chroma_db")
     monkeypatch.setattr(vector_store_service, "_client", None)
-    monkeypatch.setattr(vector_store_service, "_collection", None)
+    monkeypatch.setattr(vector_store_service, "_collections", {})
 
     yield
 
@@ -73,7 +73,7 @@ def _setup(tmp_path, monkeypatch):
         (settings.embeddings_dir / f"{video_id}.json").unlink(missing_ok=True)
         (settings.embeddings_dir / f"{video_id}.npy").unlink(missing_ok=True)
     monkeypatch.setattr(vector_store_service, "_client", None)
-    monkeypatch.setattr(vector_store_service, "_collection", None)
+    monkeypatch.setattr(vector_store_service, "_collections", {})
 
 
 def test_index_endpoint_requires_chunks_and_embeddings():
