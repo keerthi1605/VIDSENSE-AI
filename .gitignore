@@ -41,6 +41,7 @@ backend/uvicorn.pid
 
 # --- Sample/test video files (for manual testing, not project content) ---
 test_lecture.mp4
+phase5_demo.mp4
 *.sample.mp4
 
 # --- OS / editor ---
