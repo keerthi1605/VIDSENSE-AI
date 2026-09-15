@@ -39,6 +39,10 @@ backend/uvicorn_out.log
 backend/uvicorn_err.log
 backend/uvicorn.pid
 
+# --- Sample/test video files (for manual testing, not project content) ---
+test_lecture.mp4
+*.sample.mp4
+
 # --- OS / editor ---
 .DS_Store
 Thumbs.db
