@@ -9,6 +9,7 @@ added in the next steps of Phase 1 (see docs/architecture.md).
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.chat import router as chat_router
 from app.api.search import router as search_router
@@ -34,6 +35,17 @@ app = FastAPI(
     title=settings.app_name,
     debug=settings.debug,
     lifespan=lifespan,
+)
+
+# CORS: the frontend (Vite dev server, Phase 8) runs on a different
+# origin/port than this API. Wide open for local development only --
+# this is not a public-facing deployment, so there's no untrusted
+# third-party origin to worry about restricting against yet.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 app.include_router(video_router)

@@ -5,6 +5,8 @@ Thin by design: parse the request, delegate to app.services.video_service,
 return its result. No business logic lives here.
 """
 
+from typing import List
+
 from fastapi import APIRouter, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 
@@ -61,6 +63,31 @@ def add_video_from_url(request: VideoUrlRequest) -> VideoMetadata:
     in a worker thread so it doesn't block the event loop either way.
     """
     return video_service.save_video_from_url(request.url)
+
+
+@router.get("", response_model=List[VideoMetadata])
+def list_videos() -> List[VideoMetadata]:
+    """All videos with metadata on disk, newest first -- backs a
+    frontend "library" view (Phase 8)."""
+    return video_service.list_all_videos()
+
+
+@router.get("/{video_id}", response_model=VideoMetadata)
+def get_video(video_id: str) -> VideoMetadata:
+    """Fetch a single video's metadata (status, filename, source, ...)."""
+    return video_service.get_video_metadata(video_id)
+
+
+@router.get("/{video_id}/file")
+def get_video_file(video_id: str) -> FileResponse:
+    """
+    Stream the actual video file -- for a `<video>` player element.
+    Starlette's FileResponse natively supports HTTP Range requests, so
+    seeking/scrubbing in the player works without any extra code here.
+    """
+    path = video_service.get_video_file_path(video_id)
+    metadata = video_service.get_video_metadata(video_id)
+    return FileResponse(path, media_type=metadata.content_type or "video/mp4")
 
 
 @router.post("/transcribe", response_model=Transcript)

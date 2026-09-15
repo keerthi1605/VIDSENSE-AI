@@ -271,3 +271,51 @@ class FrameSearchResult(BaseModel):
 class VisualSearchResponse(BaseModel):
     query: str
     results: List[FrameSearchResult]
+
+
+class MultimodalSearchRequest(BaseModel):
+    query: str
+    top_k: Optional[int] = None
+    video_id: Optional[str] = None
+    # Override the configured fusion weights per-request, for
+    # experimentation without restarting the server. Omitted = use
+    # settings.multimodal_text_weight / multimodal_visual_weight.
+    text_weight: Optional[float] = None
+    visual_weight: Optional[float] = None
+
+
+class MultimodalResult(BaseModel):
+    """
+    One fused piece of evidence for a query -- a moment in a video that
+    matched via its transcript, via a frame's image, or (the case that
+    makes this phase worthwhile) both at once.
+
+    start_time/end_time is ALWAYS a valid, non-empty range, even for a
+    visual-only result (start_time == end_time == the frame's exact
+    timestamp) -- a consistent contract for a frontend video player to
+    seek/highlight against, regardless of which modality produced the
+    match. evidence_type says explicitly which case this is, rather
+    than making a caller infer it from which optional fields are set.
+    """
+
+    video_id: str
+    start_time: float
+    end_time: float
+    evidence_type: str  # "text", "visual", or "both"
+    text: Optional[str] = None
+    chunk_id: Optional[str] = None
+    frame_id: Optional[str] = None
+    image_path: Optional[str] = None
+    # Each raw score, min-max normalized within its own modality's
+    # result set (see retrieval_service.search_multimodal) -- 0.0 for
+    # whichever modality had no match at this moment.
+    text_score: float = 0.0
+    visual_score: float = 0.0
+    final_score: float
+
+
+class MultimodalSearchResponse(BaseModel):
+    query: str
+    text_weight: float
+    visual_weight: float
+    results: List[MultimodalResult]

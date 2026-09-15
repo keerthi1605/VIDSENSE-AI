@@ -239,6 +239,17 @@ def get_video_metadata(video_id: str) -> VideoMetadata:
     return VideoMetadata(**data)
 
 
+def list_all_videos() -> list[VideoMetadata]:
+    """All videos with metadata on disk, newest first -- backs a
+    frontend "library" view so a demo isn't limited to one video."""
+    videos = [
+        VideoMetadata(**json.loads(path.read_text(encoding="utf-8")))
+        for path in settings.videos_dir.glob("*.json")
+    ]
+    videos.sort(key=lambda v: v.uploaded_at, reverse=True)
+    return videos
+
+
 def get_video_file_path(video_id: str) -> Path:
     """Resolve a video_id to its stored file path on disk, or raise 404."""
     metadata = get_video_metadata(video_id)

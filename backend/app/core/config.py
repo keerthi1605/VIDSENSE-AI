@@ -156,6 +156,23 @@ class Settings(BaseSettings):
     clip_model_name: str = "clip-ViT-B-32"
     clip_device: str = "cpu"
 
+    # --- Multimodal fusion (Phase 6) ---
+    # Simple weighted-sum fusion, per the master roadmap: final_score =
+    # text_weight * text_score + visual_weight * visual_score. Each
+    # modality's raw scores are min-max normalized to [0,1] within their
+    # OWN returned result set first (see retrieval_service.search_multimodal)
+    # -- MiniLM and CLIP cosine scores are not on the same natural scale
+    # (empirically: MiniLM matches score ~0.7-0.85, CLIP matches ~0.25-0.35),
+    # so a naive unnormalized sum would let text silently dominate
+    # regardless of these weights. Defaults are neutral (0.5/0.5), NOT
+    # tuned against any real evaluation -- that's Phase 10's job.
+    multimodal_text_weight: float = 0.5
+    multimodal_visual_weight: float = 0.5
+    # How many results to pull from EACH modality before fusing -- more
+    # than the final top_k, since fusion needs enough candidates from
+    # both sides to actually find time-based overlaps.
+    multimodal_candidate_k: int = 10
+
     def ensure_storage_dirs(self) -> None:
         """Create all storage subdirectories if they don't already exist."""
         for d in (
