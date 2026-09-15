@@ -18,6 +18,7 @@ from app.models.schemas import (
     Transcript,
     TranscribeRequest,
     VideoMetadata,
+    VideoUrlRequest,
 )
 from app.services import (
     audio_service,
@@ -44,6 +45,22 @@ async def upload_video(file: UploadFile = File(...)) -> VideoMetadata:
     transcription/search calls will reference.
     """
     return await video_service.save_video_upload(file)
+
+
+@router.post("/from-url", response_model=VideoMetadata, status_code=201)
+def add_video_from_url(request: VideoUrlRequest) -> VideoMetadata:
+    """
+    Download a video from a URL (YouTube, or anything else yt-dlp
+    supports) and store it exactly like a direct upload -- every
+    downstream endpoint works identically afterward regardless of how
+    the video arrived. See video_service.save_video_from_url for the
+    probe-before-download and resolution-cap reasoning.
+
+    Sync `def`: this is network I/O plus a potential FFmpeg remux, not
+    worth async-ifying for a single-request local tool; FastAPI runs it
+    in a worker thread so it doesn't block the event loop either way.
+    """
+    return video_service.save_video_from_url(request.url)
 
 
 @router.post("/transcribe", response_model=Transcript)

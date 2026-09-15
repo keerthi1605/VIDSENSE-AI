@@ -94,6 +94,49 @@ Each phase must leave the project runnable end-to-end before the next begins.
   (includes one-time model download + load), subsequent transcriptions in the
   same process ~2.4 seconds.
 
+### Phase 1, Step 4 — Ingest a video from a URL (YouTube, etc.)
+
+- `app/services/video_service.save_video_from_url()` — downloads via `yt-dlp` and
+  stores the result **exactly like a direct upload** (same `VideoMetadata` shape,
+  same `storage/videos/{video_id}.mp4` layout) so every downstream endpoint
+  (transcribe, chunks, embeddings, frames, ...) works unchanged regardless of how
+  the video arrived. `source_url` is the only new field, kept purely for
+  provenance.
+- Two-phase by design: **probe** the video's metadata first (`extract_info(...,
+  download=False)`) and reject a too-long video or a live stream *before*
+  spending any bandwidth/disk — only then actually download.
+- Resolution capped at 720p in the format selector (`yt_dlp_format`) — this
+  machine is CPU-only and storage-conscious by design; no reason to pull 4K.
+  `merge_output_format` + an `FFmpegVideoConvertor` postprocessor guarantee a
+  consistent `.mp4` regardless of the source container.
+- Same "never trust an external name for a path" discipline as the direct
+  upload: the file is saved under the generated `video_id`, never the
+  remote-provided title (which becomes a display-only field, `original_filename`).
+- `POST /api/videos/from-url` — `{"url": "..."}` → the same `VideoMetadata`
+  response shape as `/upload`.
+- **Real bug caught and fixed during verification**: `ffmpeg_location` was
+  initially passed the bare command name (`"ffmpeg"`), which yt-dlp does NOT
+  resolve via PATH the way a shell would — it failed with "ffmpeg is not
+  installed" despite ffmpeg being on PATH and working everywhere else in this
+  project. Fixed by resolving it explicitly via `shutil.which()` first.
+- Verified two ways:
+  1. Mocked `yt_dlp.YoutubeDL` entirely (`test_video_from_url.py`) — no network
+     in the automated suite. Covers: successful download, duration-limit
+     rejection, live-stream rejection, probe failure (400), download failure
+     with partial-file cleanup (502), missing-output-file (500), and that a
+     hostile/weird remote title never influences the stored path.
+  2. **Real live download**: used yt-dlp's own search syntax
+     (`ytsearch1:Big Buck Bunny trailer official Blender Foundation`, a
+     Creative-Commons-licensed official Blender Foundation short) to avoid
+     hardcoding a URL that might rot. Downloaded a real 81.8MB, 720p, ~10.5-minute
+     AV1 video, then ran it through the real `/transcribe` endpoint — the
+     result was Whisper hallucinating "I'm sorry" at each ~30s window boundary
+     (the video has no dialogue, only music/sound effects), a textbook
+     real-world instance of the exact hallucination-on-non-speech-audio failure
+     mode documented in `docs/concepts.md`'s Phase 1 section. The pipeline
+     integration itself was proven correct: identical request/response shapes
+     to a direct upload, no special-casing needed anywhere downstream.
+
 ### Phase 2, Step 1 — Transcript chunking
 
 - `app/services/chunking_service.py` — merges consecutive `TranscriptSegment`s

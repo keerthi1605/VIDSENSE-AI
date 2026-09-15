@@ -84,9 +84,33 @@ too slow for interactive use, and `tiny` sacrifices real accuracy. This is a con
 | Cloud ASR APIs (Google STT, AWS Transcribe, AssemblyAI) | Would work, often more accurate — but costs money per minute, needs network, and violates the project's "local/free by default" hardware-aware design. Also a real dependency risk for an offline demo. |
 | Classic hybrid (Kaldi) | Requires building a pronunciation lexicon and language model per domain — far more setup for worse generalization than a large pretrained end-to-end model |
 
+### Ingesting a video from a URL (Phase 1, Step 4)
+On top of direct upload, `POST /api/videos/from-url` downloads a video via `yt-dlp`
+(YouTube and most other video sites) and stores it **identically** to a direct
+upload — same `VideoMetadata` shape, same file layout — so every later phase
+(transcription, chunking, embeddings, frames) needs zero awareness of how the video
+arrived. It probes duration/liveness *before* downloading (reject early, don't waste
+bandwidth), and caps resolution at 720p for the same CPU/storage reasons as everything
+else in this project.
+
+A real debugging example worth knowing cold: `yt-dlp`'s `ffmpeg_location` option
+does **not** resolve a bare command name via PATH the way a shell does — passing it
+`"ffmpeg"` failed with *"ffmpeg is not installed"* even though `ffmpeg` was on PATH
+and working everywhere else in the project (audio extraction, frame remuxing). The
+fix was resolving it explicitly first, with Python's `shutil.which("ffmpeg")`, and
+only passing a result if one was found. **The general lesson, not just this one bug**:
+different tools/libraries make different, sometimes-undocumented assumptions about
+what a "command name" setting means — never assume PATH resolution is universal
+just because it worked for one tool (FFmpeg itself, invoked directly) but not another
+(yt-dlp, invoking FFmpeg *for* you via a config option).
+
 ### Known limitations (say these out loud in a viva, don't wait to be asked)
 - Whisper can **hallucinate** text during silence or non-speech audio (music, noise) —
-  a known, documented failure mode, not specific to our implementation.
+  a known, documented failure mode, not specific to our implementation. **Observed for
+  real** while testing Step 4: a downloaded Creative-Commons animated short with no
+  dialogue produced repeated hallucinated "I'm sorry" text at each ~30-second internal
+  window boundary — Whisper's chunking interval — a live instance of exactly this
+  limitation, not a hypothetical one.
 - No **speaker diarization** — we don't know *who* said something, only *what* and *when*.
 - Segment-level, not word-level, timestamps — "jump to video" is accurate to a few
   seconds, not to the exact word.

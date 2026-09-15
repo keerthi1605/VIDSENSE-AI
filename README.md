@@ -31,6 +31,7 @@ prep material).
 
 - **Backend:** Python 3.11, FastAPI, Uvicorn, Pydantic
 - **Video/audio:** FFmpeg, OpenCV
+- **Video ingestion:** yt-dlp (upload a file, or ingest from a URL — YouTube, etc.)
 - **Speech-to-text:** Faster-Whisper (CPU/int8 — see hardware note below)
 - **Embeddings:** Sentence-Transformers (text), CLIP (visual, added Phase 5)
 - **Vector DB:** ChromaDB
@@ -106,9 +107,23 @@ Sentence-Transformers, CLIP); already-cached models are unaffected.
 
 ## API (Phases 1–5): upload to answered question, plus visual search
 
+**On `/api/videos/from-url`**: only use it on content you actually have the right
+to process (your own recordings, official course material, public-domain/Creative
+Commons sources, etc.) — it downloads a real video file to local disk, and
+YouTube's own Terms of Service restrict downloading in general. Capped at
+2 hours and 720p by default (`MAX_YOUTUBE_DURATION_SECONDS`, `YT_DLP_FORMAT`
+in `.env.example`).
+
 ```bash
-# 1. Upload a video, note the returned video_id
+# 1. Upload a video, note the returned video_id -- either a local file...
 curl -X POST http://127.0.0.1:8000/api/videos/upload -F "file=@lecture.mp4"
+
+# ...or a URL (YouTube, or anything yt-dlp supports). Downloaded, capped at
+# 720p, and stored exactly like a direct upload -- every step below is
+# identical either way.
+curl -X POST http://127.0.0.1:8000/api/videos/from-url \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://www.youtube.com/watch?v=<video_id>"}'
 
 # 2. Transcribe it (first call downloads+loads the Whisper model, ~1-2 min;
 #    later calls in the same running process take a few seconds)

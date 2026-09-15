@@ -68,12 +68,17 @@ def test_upload_rejects_file_over_size_cap(monkeypatch):
     # catches it mid-write instead of only after the fact.
     monkeypatch.setattr(settings, "max_upload_size_mb", 0.000001)  # ~1 byte
 
+    # Snapshot before, not an assumption of an empty directory -- other
+    # legitimate videos (uploaded by other tests, or real manual usage)
+    # may already be sitting in storage/videos/.
+    before = set(settings.videos_dir.glob("*.mp4"))
+
     response = client.post(
         "/api/videos/upload",
         files={"file": ("lecture.mp4", b"more than one byte of data", "video/mp4")},
     )
     assert response.status_code == 413
 
-    # No partial file should be left behind.
-    leftover = list(settings.videos_dir.glob("*.mp4"))
-    assert leftover == []
+    # No NEW partial file should have been left behind by this request.
+    after = set(settings.videos_dir.glob("*.mp4"))
+    assert after == before

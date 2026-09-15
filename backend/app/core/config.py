@@ -52,6 +52,20 @@ class Settings(BaseSettings):
     max_upload_size_mb: int = 1024  # 1 GB ceiling, revisit later
     allowed_video_extensions: tuple[str, ...] = (".mp4", ".mov", ".mkv", ".avi", ".webm")
 
+    # --- Video ingestion from URL, e.g. YouTube (Phase 1, Step 4) ---
+    # Rejected BEFORE downloading (probed via yt-dlp with download=False)
+    # -- no point spending bandwidth/disk on something we'll reject anyway.
+    max_youtube_duration_seconds: int = 7200  # 2 hours
+    # Capped at 720p on purpose: this machine's whole design is CPU-only
+    # and storage-conscious (see Hardware note in README) -- no reason to
+    # pull 4K just because a source offers it. merge_output_format +
+    # the FFmpegVideoConvertor postprocessor (in video_service.py)
+    # guarantee a consistent .mp4 regardless of the source container.
+    yt_dlp_format: str = (
+        "bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]"
+        "/best[height<=720][ext=mp4]/best[height<=720]/best"
+    )
+
     # --- Transcription (Faster-Whisper) ---
     # Model size is deliberately small/base-tier by default: this machine's
     # GPU (2GB VRAM, old driver) cannot accelerate anything bigger, so we

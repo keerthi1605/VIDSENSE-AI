@@ -27,6 +27,14 @@ class VideoMetadata(BaseModel):
     # (UPLOADED/PROCESSING_AUDIO/TRANSCRIBING/INDEXING/READY/FAILED)
     # once background processing exists (Phase 9).
     status: str = "uploaded"
+    # Set only for videos ingested via /api/videos/from-url; None for a
+    # direct file upload. Provenance only -- every downstream pipeline
+    # step treats a URL-ingested video identically to an uploaded one.
+    source_url: Optional[str] = None
+
+
+class VideoUrlRequest(BaseModel):
+    url: str
 
 
 class TranscribeRequest(BaseModel):
