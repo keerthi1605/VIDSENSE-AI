@@ -36,8 +36,19 @@ export const api = {
     request("/api/videos/from-url", { method: "POST", body: JSON.stringify({ url }) }),
 
   // --- Phase 1: transcription ---
-  transcribe: (videoId) =>
-    request("/api/videos/transcribe", { method: "POST", body: JSON.stringify({ video_id: videoId }) }),
+  // initialPrompt/hotwords are optional per-video domain hints (e.g. a
+  // technical lecture's course name vs. a cooking video's ingredient
+  // list) -- useful when testing across genres. Omitted keys fall back
+  // to the backend's settings-level default.
+  transcribe: (videoId, { initialPrompt, hotwords } = {}) =>
+    request("/api/videos/transcribe", {
+      method: "POST",
+      body: JSON.stringify({
+        video_id: videoId,
+        initial_prompt: initialPrompt ?? null,
+        hotwords: hotwords ?? null,
+      }),
+    }),
   getTranscript: (videoId) => request(`/api/videos/${videoId}/transcript`),
 
   // --- Phase 2: chunking + embeddings ---

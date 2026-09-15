@@ -73,6 +73,27 @@ class Settings(BaseSettings):
     whisper_model_size: str = "base"
     whisper_device: str = "cpu"
     whisper_compute_type: str = "int8"
+    # Silero VAD (bundled with faster-whisper) strips silence/music before
+    # decoding. Whisper is known to hallucinate repeated phrases into long
+    # silent stretches on single-speaker audio (exactly our lecture use
+    # case) -- removing that input removes the failure mode, and decoding
+    # less audio is also faster.
+    whisper_vad_filter: bool = True
+    whisper_vad_min_silence_ms: int = 500
+    # Per-word start/end times, not just per-segment. Lets citations point
+    # at the exact word instead of the nearest few-second segment, and is
+    # a prerequisite for aligning text chunks to visual scene boundaries.
+    whisper_word_timestamps: bool = True
+    # Whisper conditions each segment's decoding on the previous segment's
+    # text by default -- helpful for short clips, but on a long
+    # single-topic lecture it's the main driver of repetition-loop
+    # hallucination (the model gets "stuck" reusing prior phrasing).
+    whisper_condition_on_previous_text: bool = False
+    # Optional domain hint biasing decoding toward correct spelling of
+    # jargon/proper nouns (e.g. course name, technical terms). Overridable
+    # per-request via TranscribeRequest.initial_prompt; this is just the
+    # fallback when a request doesn't supply one.
+    whisper_initial_prompt: str | None = None
 
     # --- Audio extraction (FFmpeg) ---
     # Bare command name: resolved via PATH. Override in .env with a full

@@ -39,6 +39,25 @@ class VideoUrlRequest(BaseModel):
 
 class TranscribeRequest(BaseModel):
     video_id: str
+    # Optional per-video overrides for domain vocabulary, so testing
+    # across genres (a technical lecture vs. a cooking video vs. an
+    # interview) doesn't require changing global config between runs.
+    # Falls back to settings.whisper_initial_prompt/hotwords when omitted.
+    initial_prompt: Optional[str] = None
+    hotwords: Optional[str] = None
+
+
+class WordTimestamp(BaseModel):
+    """One word within a segment, with its own exact start/end time.
+
+    Only populated when transcription runs with word_timestamps enabled
+    (see settings.whisper_word_timestamps); otherwise a segment's `words`
+    is left as None rather than an empty list, so callers can tell
+    "not requested" apart from "segment had no words" (silence)."""
+
+    word: str
+    start_time: float
+    end_time: float
 
 
 class TranscriptSegment(BaseModel):
@@ -55,6 +74,7 @@ class TranscriptSegment(BaseModel):
     start_time: float
     end_time: float
     text: str
+    words: Optional[List[WordTimestamp]] = None
 
 
 class Transcript(BaseModel):

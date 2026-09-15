@@ -107,7 +107,10 @@ def transcribe_video(request: TranscribeRequest) -> Transcript:
     try:
         audio_path = audio_service.extract_audio(video_path, request.video_id)
         transcript = transcription_service.transcribe_and_save(
-            request.video_id, audio_path
+            request.video_id,
+            audio_path,
+            initial_prompt=request.initial_prompt,
+            hotwords=request.hotwords,
         )
     except HTTPException:
         video_service.update_video_status(request.video_id, "failed")
