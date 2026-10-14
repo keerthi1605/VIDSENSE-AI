@@ -487,3 +487,73 @@
   padding: 4px 6px;
   color: var(--text-dim);
 }
+
+/* --- Fused (multimodal) search --- */
+.weight-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.72rem;
+  color: var(--text-dim);
+  margin: 6px 0 10px;
+}
+
+.weight-row input[type="range"] {
+  flex: 1;
+  accent-color: var(--accent);
+}
+
+.weight-value {
+  min-width: 54px;
+  text-align: right;
+  color: var(--accent);
+}
+
+.fused-card {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.fused-thumb {
+  width: 96px;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.fused-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.evidence-badge {
+  font-size: 0.62rem;
+  padding: 1px 7px;
+  border-radius: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.evidence-text {
+  background: rgba(109, 141, 255, 0.15);
+  color: var(--accent);
+}
+
+.evidence-visual {
+  background: rgba(192, 132, 252, 0.15);
+  color: #c084fc;
+}
+
+.evidence-both {
+  background: rgba(74, 222, 128, 0.15);
+  color: var(--good);
+}
+
+.score-split {
+  font-size: 0.68rem;
+  color: var(--text-dim);
+  margin-top: 4px;
+}

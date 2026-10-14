@@ -373,3 +373,40 @@ Each phase must leave the project runnable end-to-end before the next begins.
 Phase 5 (frame extraction, CLIP embeddings, vector-store indexing) is now
 complete. The visual pipeline is a full parallel of the text pipeline
 (Phases 2+3), ready for Phase 6 to fuse both searches into one ranked list.
+
+## Phase 6 — Multimodal Retrieval (text + visual fusion) (complete)
+
+- `retrieval_service.search_multimodal()` — fuses the two existing, independent
+  searches (MiniLM over transcript chunks, CLIP over frames) into ONE ranked
+  list of moments. Exposed as `POST`/`GET /api/search/multimodal`.
+- **Algorithm**: (1) pull `multimodal_candidate_k` (10) candidates from each
+  modality; (2) **min-max normalize each modality's scores within its own list**
+  — MiniLM matches score ~0.7–0.85 while CLIP matches score only ~0.25–0.35, so
+  an unnormalized sum would let text win regardless of weights; (3) **align by
+  time** — a frame whose timestamp lies inside a chunk's `[start, end]` (same
+  video) is evidence for the same moment and merges into one `both` result
+  (chunk text + best-matching frame); unmatched chunks stay `text`, unmatched
+  frames stay `visual` (`start == end ==` frame timestamp, so the frontend always
+  has a valid range to seek to); (4) `final = text_weight·text + visual_weight·visual`.
+- A moment backed by both modalities can outrank a stronger single-modality
+  match — that agreement is the point of fusion (covered by a dedicated test).
+- Weights default to 0.5/0.5 (`multimodal_text_weight` / `multimodal_visual_weight`,
+  **not tuned** — Phase 10's job) and can be overridden per request; negative
+  weights are rejected (422).
+- Edge cases handled explicitly: empty modality (no frames indexed yet), a single
+  result or identical scores (no spread → each gets 1.0, not 0/0), frames from a
+  different video never merge into a chunk, `top_k` truncation after fusion with a
+  wider candidate pool.
+- Frontend: a **Fused search** tab with a transcript↔visual balance slider,
+  evidence-type badges, per-modality score split, matched-frame thumbnails, and
+  click-to-seek.
+- Verified: 10 mocked unit tests (normalization, merge, tie-break, weights, video
+  isolation), 5 integration tests (real ChromaDB in a temp dir, both collections,
+  real HTTP endpoints, only the two query encoders faked), and live in the real
+  app on the coffee-cake video (query "cinnamon sugar sprinkled on the batter"
+  returned a `both` result with the cinnamon-swirl frame; clicking it seeked the
+  player to the chunk start).
+- **Known limitation (motivates the content-aligned chunking work)**: time
+  alignment is only as tight as the chunks. The coffee-cake video is indexed as 2
+  chunks of ~200 s each, so almost any frame lands "inside" a chunk and the `both`
+  match is loose. Chunk boundaries are word-count-driven, not content-driven.

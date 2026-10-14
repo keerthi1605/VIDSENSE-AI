@@ -83,5 +83,19 @@ export const api = {
       body: JSON.stringify({ query, video_id: videoId || undefined, top_k: topK }),
     }),
 
+  // --- Phase 6: fused text + visual search ---
+  // textWeight/visualWeight are optional; omitted = backend defaults.
+  searchMultimodal: (query, videoId, topK, textWeight, visualWeight) =>
+    request("/api/search/multimodal", {
+      method: "POST",
+      body: JSON.stringify({
+        query,
+        video_id: videoId || undefined,
+        top_k: topK,
+        text_weight: textWeight,
+        visual_weight: visualWeight,
+      }),
+    }),
+
   health: () => request("/health"),
 };

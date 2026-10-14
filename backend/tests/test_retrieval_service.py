@@ -259,3 +259,159 @@ def test_search_frames_uses_default_top_k_when_not_specified(monkeypatch):
     monkeypatch.setattr(vector_store_service, "query", fake_query)
     retrieval_service.search_frames(query="anything")
     assert captured["top_k"] == settings.search_default_top_k
+
+
+# ---------------------------------------------------------------------
+# Multimodal fusion (Phase 6)
+# ---------------------------------------------------------------------
+
+from app.models.schemas import FrameSearchResult, SearchResponse, SearchResult, VisualSearchResponse
+
+
+def _text_hit(chunk_id, start, end, score, video_id="v1"):
+    return SearchResult(
+        video_id=video_id, chunk_id=chunk_id, text=f"text of {chunk_id}",
+        start_time=start, end_time=end, score=score,
+    )
+
+
+def _frame_hit(frame_id, timestamp, score, video_id="v1"):
+    return FrameSearchResult(
+        video_id=video_id, frame_id=frame_id, timestamp=timestamp,
+        image_path=f"{frame_id}.jpg", score=score,
+    )
+
+
+def _stub_modalities(monkeypatch, text_hits, frame_hits):
+    monkeypatch.setattr(
+        retrieval_service, "search",
+        lambda query, top_k=None, video_id=None: SearchResponse(query=query, results=text_hits),
+    )
+    monkeypatch.setattr(
+        retrieval_service, "search_frames",
+        lambda query, top_k=None, video_id=None: VisualSearchResponse(query=query, results=frame_hits),
+    )
+
+
+def test_min_max_normalize_rescales_to_unit_range():
+    assert retrieval_service._min_max_normalize([0.5, 0.75, 1.0]) == [0.0, 0.5, 1.0]
+
+
+def test_min_max_normalize_handles_empty_and_identical_scores():
+    assert retrieval_service._min_max_normalize([]) == []
+    # No spread to rescale (incl. a lone result): "best of its modality".
+    assert retrieval_service._min_max_normalize([0.3]) == [1.0]
+    assert retrieval_service._min_max_normalize([0.3, 0.3]) == [1.0, 1.0]
+
+
+def test_fusion_normalizes_each_modality_independently(monkeypatch):
+    """MiniLM-scale (0.8) and CLIP-scale (0.3) top scores must both end
+    up as 1.0 -- otherwise text would silently dominate."""
+    _stub_modalities(
+        monkeypatch,
+        [_text_hit("c0", 0, 5, 0.80), _text_hit("c1", 100, 105, 0.60)],
+        [_frame_hit("f0", 200.0, 0.30), _frame_hit("f1", 300.0, 0.20)],
+    )
+    response = retrieval_service.search_multimodal("q", top_k=10)
+    by_id = {(r.chunk_id or r.frame_id): r for r in response.results}
+    assert by_id["c0"].text_score == 1.0
+    assert by_id["f0"].visual_score == 1.0
+    assert by_id["c1"].text_score == 0.0
+    assert by_id["f1"].visual_score == 0.0
+
+
+def test_frame_inside_chunk_merges_into_both_result(monkeypatch):
+    _stub_modalities(
+        monkeypatch,
+        [_text_hit("c0", 10, 20, 0.8), _text_hit("c1", 50, 60, 0.4)],
+        [_frame_hit("f0", 15.0, 0.3), _frame_hit("f1", 90.0, 0.1)],
+    )
+    response = retrieval_service.search_multimodal("q", top_k=10)
+
+    both = [r for r in response.results if r.evidence_type == "both"]
+    assert len(both) == 1
+    assert both[0].chunk_id == "c0" and both[0].frame_id == "f0"
+    assert both[0].text == "text of c0"
+    assert both[0].image_path == "f0.jpg"
+    assert (both[0].start_time, both[0].end_time) == (10, 20)
+    assert both[0].final_score == pytest.approx(0.5 * 1.0 + 0.5 * 1.0)
+
+    # The matched frame is NOT also emitted as a separate visual result.
+    assert [r.frame_id for r in response.results if r.evidence_type == "visual"] == ["f1"]
+    assert [r.chunk_id for r in response.results if r.evidence_type == "text"] == ["c1"]
+
+
+def test_visual_only_result_has_degenerate_but_valid_time_range(monkeypatch):
+    _stub_modalities(monkeypatch, [], [_frame_hit("f0", 42.5, 0.3)])
+    result = retrieval_service.search_multimodal("q").results[0]
+    assert result.evidence_type == "visual"
+    assert result.start_time == result.end_time == 42.5
+    assert result.text is None and result.chunk_id is None
+
+
+def test_agreement_between_modalities_can_outrank_stronger_single_match(monkeypatch):
+    """The point of fusion: a moment both modalities like beats a moment
+    only text likes, even if that text match is the single best chunk."""
+    _stub_modalities(
+        monkeypatch,
+        [_text_hit("top_text_only", 0, 5, 0.85), _text_hit("agreed", 50, 60, 0.80)],
+        [_frame_hit("f_agreed", 55.0, 0.30), _frame_hit("f_other", 500.0, 0.10)],
+    )
+    results = retrieval_service.search_multimodal("q", top_k=10).results
+    assert results[0].chunk_id == "agreed"
+    assert results[0].evidence_type == "both"
+
+
+def test_frame_from_a_different_video_is_not_merged(monkeypatch):
+    _stub_modalities(
+        monkeypatch,
+        [_text_hit("c0", 10, 20, 0.8, video_id="v1")],
+        [_frame_hit("f0", 15.0, 0.3, video_id="v2")],
+    )
+    evidence = {r.evidence_type for r in retrieval_service.search_multimodal("q").results}
+    assert evidence == {"text", "visual"}
+
+
+def test_weights_default_to_settings_and_can_be_overridden(monkeypatch):
+    from app.core.config import settings
+
+    _stub_modalities(monkeypatch, [_text_hit("c0", 0, 5, 0.8)], [_frame_hit("f0", 99.0, 0.3)])
+
+    default = retrieval_service.search_multimodal("q")
+    assert default.text_weight == settings.multimodal_text_weight
+    assert default.visual_weight == settings.multimodal_visual_weight
+
+    visual_heavy = retrieval_service.search_multimodal("q", text_weight=0.0, visual_weight=1.0)
+    assert visual_heavy.results[0].evidence_type == "visual"
+    assert visual_heavy.results[0].final_score == 1.0
+    assert visual_heavy.results[1].final_score == 0.0
+
+
+def test_negative_weights_are_rejected(monkeypatch):
+    _stub_modalities(monkeypatch, [], [])
+    with pytest.raises(ValueError, match="non-negative"):
+        retrieval_service.search_multimodal("q", text_weight=-0.1)
+
+
+def test_top_k_truncates_fused_results_and_candidate_pool_is_wider(monkeypatch):
+    from app.core.config import settings
+
+    captured = {}
+
+    def fake_search(query, top_k=None, video_id=None):
+        captured["text_k"] = top_k
+        return SearchResponse(query=query, results=[_text_hit(f"c{i}", i * 10, i * 10 + 5, 0.9 - i * 0.05) for i in range(6)])
+
+    monkeypatch.setattr(retrieval_service, "search", fake_search)
+    monkeypatch.setattr(
+        retrieval_service, "search_frames",
+        lambda query, top_k=None, video_id=None: VisualSearchResponse(query=query, results=[]),
+    )
+    response = retrieval_service.search_multimodal("q", top_k=2)
+    assert len(response.results) == 2
+    assert captured["text_k"] == max(settings.multimodal_candidate_k, 2)
+
+
+def test_empty_index_returns_empty_results(monkeypatch):
+    _stub_modalities(monkeypatch, [], [])
+    assert retrieval_service.search_multimodal("q").results == []

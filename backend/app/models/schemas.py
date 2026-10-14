@@ -12,7 +12,7 @@ response model will likely diverge and we'll split them.
 from datetime import datetime
 from typing import List, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class VideoMetadata(BaseModel):
@@ -300,8 +300,8 @@ class MultimodalSearchRequest(BaseModel):
     # Override the configured fusion weights per-request, for
     # experimentation without restarting the server. Omitted = use
     # settings.multimodal_text_weight / multimodal_visual_weight.
-    text_weight: Optional[float] = None
-    visual_weight: Optional[float] = None
+    text_weight: Optional[float] = Field(None, ge=0)
+    visual_weight: Optional[float] = Field(None, ge=0)
 
 
 class MultimodalResult(BaseModel):

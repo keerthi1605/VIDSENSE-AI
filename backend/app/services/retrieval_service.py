@@ -24,6 +24,8 @@ from app.models.schemas import (
     FrameSet,
     FrameEmbeddingSet,
     IndexResult,
+    MultimodalResult,
+    MultimodalSearchResponse,
     SearchResponse,
     SearchResult,
     VisualSearchResponse,
@@ -202,3 +204,131 @@ def search_frames(
         for r in raw_results
     ]
     return VisualSearchResponse(query=query, results=results)
+
+
+# ---------------------------------------------------------------------
+# Multimodal fusion -- Phase 6
+# ---------------------------------------------------------------------
+
+def _min_max_normalize(scores: list[float]) -> list[float]:
+    """
+    Rescale a list of scores to [0, 1] relative to ITS OWN min and max.
+
+    Needed because MiniLM and CLIP cosine scores live on different
+    natural scales (a good text match is ~0.7-0.85, a good CLIP match is
+    only ~0.25-0.35): summing raw scores would let text silently win
+    whatever the weights say. When every score is identical (including
+    a single result) there is no spread to rescale, so each gets 1.0 --
+    "the best this modality found" -- rather than 0/0.
+    """
+    if not scores:
+        return []
+    lo, hi = min(scores), max(scores)
+    if hi == lo:
+        return [1.0 for _ in scores]
+    return [(s - lo) / (hi - lo) for s in scores]
+
+
+def search_multimodal(
+    query: str,
+    top_k: Optional[int] = None,
+    video_id: Optional[str] = None,
+    text_weight: Optional[float] = None,
+    visual_weight: Optional[float] = None,
+) -> MultimodalSearchResponse:
+    """
+    Fuse transcript search and visual search into one ranked list of
+    moments in a video.
+
+    1. Pull `multimodal_candidate_k` candidates from EACH modality
+       (MiniLM over chunks, CLIP over frames).
+    2. Min-max normalize each modality's scores within its own list.
+    3. Align by time: a frame whose timestamp falls inside a chunk's
+       [start_time, end_time] (same video) is evidence for the SAME
+       moment, so they merge into one "both" result carrying the chunk's
+       text plus its best-matching frame. Unmatched chunks stay "text";
+       unmatched frames stay "visual" (start == end == frame timestamp).
+    4. final_score = text_weight * text_score + visual_weight * visual_score.
+
+    A moment backed by both modalities can therefore outrank a stronger
+    single-modality match -- that agreement is the point of fusion.
+    Fusion only sees frames among the visual candidates: a frame that
+    would overlap a retrieved chunk but wasn't itself retrieved is not
+    pulled in (keeps this a rank-fusion, not a second lookup).
+    """
+    resolved_top_k = top_k or settings.search_default_top_k
+    tw = settings.multimodal_text_weight if text_weight is None else text_weight
+    vw = settings.multimodal_visual_weight if visual_weight is None else visual_weight
+    if tw < 0 or vw < 0:
+        raise ValueError("Fusion weights must be non-negative.")
+
+    candidate_k = max(settings.multimodal_candidate_k, resolved_top_k)
+    text_hits = search(query, top_k=candidate_k, video_id=video_id).results
+    frame_hits = search_frames(query, top_k=candidate_k, video_id=video_id).results
+
+    text_scores = _min_max_normalize([h.score for h in text_hits])
+    frame_scores = _min_max_normalize([f.score for f in frame_hits])
+
+    fused: list[MultimodalResult] = []
+    matched_frame_ids: set[str] = set()
+
+    for hit, t_score in zip(text_hits, text_scores):
+        overlapping = [
+            (frame, f_score)
+            for frame, f_score in zip(frame_hits, frame_scores)
+            if frame.video_id == hit.video_id and hit.start_time <= frame.timestamp <= hit.end_time
+        ]
+        if overlapping:
+            best_frame, best_f_score = max(overlapping, key=lambda pair: pair[1])
+            matched_frame_ids.update(frame.frame_id for frame, _ in overlapping)
+            fused.append(
+                MultimodalResult(
+                    video_id=hit.video_id,
+                    start_time=hit.start_time,
+                    end_time=hit.end_time,
+                    evidence_type="both",
+                    text=hit.text,
+                    chunk_id=hit.chunk_id,
+                    frame_id=best_frame.frame_id,
+                    image_path=best_frame.image_path,
+                    text_score=t_score,
+                    visual_score=best_f_score,
+                    final_score=tw * t_score + vw * best_f_score,
+                )
+            )
+        else:
+            fused.append(
+                MultimodalResult(
+                    video_id=hit.video_id,
+                    start_time=hit.start_time,
+                    end_time=hit.end_time,
+                    evidence_type="text",
+                    text=hit.text,
+                    chunk_id=hit.chunk_id,
+                    text_score=t_score,
+                    final_score=tw * t_score,
+                )
+            )
+
+    for frame, f_score in zip(frame_hits, frame_scores):
+        if frame.frame_id in matched_frame_ids:
+            continue
+        fused.append(
+            MultimodalResult(
+                video_id=frame.video_id,
+                start_time=frame.timestamp,
+                end_time=frame.timestamp,
+                evidence_type="visual",
+                frame_id=frame.frame_id,
+                image_path=frame.image_path,
+                visual_score=f_score,
+                final_score=vw * f_score,
+            )
+        )
+
+    # Stable sort: ties keep text-before-frames order, and "both" wins a
+    # tie against single-modality evidence.
+    fused.sort(key=lambda r: (-r.final_score, r.evidence_type != "both"))
+    return MultimodalSearchResponse(
+        query=query, text_weight=tw, visual_weight=vw, results=fused[:resolved_top_k]
+    )
