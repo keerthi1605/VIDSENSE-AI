@@ -117,6 +117,11 @@ class ChunkSet(BaseModel):
     created_at: datetime
     chunk_target_words: int
     chunk_overlap_segments: int
+    # "word_count" (plain), or "scene_aligned" when visual scene changes
+    # steered the boundaries. Old chunk files default to "word_count".
+    alignment: str = "word_count"
+    scene_boundaries_available: int = 0
+    scene_cuts_applied: int = 0
     chunks: List[Chunk]
 
 
@@ -235,7 +240,11 @@ class FrameSet(BaseModel):
     video_id: str
     created_at: datetime
     sample_interval_seconds: float
+    # Threshold of whichever metric diff_method names (SSIM: new scene
+    # when similarity < threshold; MAD: new scene when difference >= it).
     diff_threshold: float
+    # Manifests written before SSIM support have no such field -> "mad".
+    diff_method: str = "mad"
     frames: List[Frame]
 
 

@@ -10,6 +10,7 @@ from typing import List
 from fastapi import APIRouter, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 
+from app.core.config import settings
 from app.models.schemas import (
     ChunkSet,
     EmbeddingSet,
@@ -151,7 +152,15 @@ def chunk_video(video_id: str) -> ChunkSet:
             detail=f"No transcript found for video '{video_id}'. "
             "Transcribe it first via POST /api/videos/transcribe.",
         )
-    return chunking_service.chunk_and_save(transcript)
+    # Content-aligned chunking: if frames were already extracted, their scene
+    # changes steer the chunk boundaries. Frames are optional -- without
+    # them (or with the setting off) this is plain word-count chunking.
+    scene_boundaries = (
+        frame_service.get_scene_boundaries(video_id)
+        if settings.chunk_align_to_scenes
+        else None
+    )
+    return chunking_service.chunk_and_save(transcript, scene_boundaries=scene_boundaries)
 
 
 @router.get("/{video_id}/chunks", response_model=ChunkSet)

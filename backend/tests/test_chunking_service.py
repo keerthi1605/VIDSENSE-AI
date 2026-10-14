@@ -114,3 +114,114 @@ def test_chunk_and_save_persists_and_reloads(tmp_path, monkeypatch):
 def test_get_chunk_set_returns_none_when_missing(tmp_path, monkeypatch):
     monkeypatch.setattr(settings, "chunks_dir", tmp_path)
     assert chunking_service.get_chunk_set("nonexistent") is None
+
+
+# ---------------------------------------------------------------------
+# Content-aligned chunking (visual scene boundaries steer chunk cuts)
+# ---------------------------------------------------------------------
+
+@pytest.fixture
+def scene_settings(monkeypatch):
+    """Word ceiling out of the way, 8-word floor, 5s sampling interval:
+    segment i starts at 5*i, so a boundary b maps to the segment whose
+    start is nearest (b - 2.5)."""
+    monkeypatch.setattr(settings, "chunk_target_words", 1000)
+    monkeypatch.setattr(settings, "chunk_min_words", 8)
+    monkeypatch.setattr(settings, "frame_sample_interval_seconds", 5.0)
+
+
+def test_no_boundaries_is_identical_to_plain_word_count_chunking():
+    segments = [_segment(i) for i in range(12)]
+    plain = chunking_service.chunk_transcript(_transcript(segments))
+    assert chunking_service.chunk_transcript(_transcript(segments), scene_boundaries=[]) == plain
+    assert chunking_service.chunk_transcript(_transcript(segments), scene_boundaries=None) == plain
+
+
+def test_scene_boundary_cuts_chunk_at_nearest_segment_start_without_overlap(scene_settings):
+    segments = [_segment(i) for i in range(10)]  # 4 words each, starts 0,5,...,45
+    # Boundary 27.5 -> estimate 25.0 -> segment 5 (start 25).
+    chunks = chunking_service.chunk_transcript(_transcript(segments), scene_boundaries=[27.5])
+
+    assert len(chunks) == 2
+    assert chunks[0].end_time == segments[4].end_time
+    assert chunks[1].start_time == segments[5].start_time
+    # A scene change is a deliberate boundary: no overlap carried across it.
+    assert "seg4word0" not in chunks[1].text
+    assert "seg5word0" not in chunks[0].text
+
+
+def test_boundary_snaps_to_the_nearest_segment_start_never_interpolating(scene_settings):
+    segments = [_segment(i) for i in range(10)]
+    # Estimate 23.5 is 1.5s from start 25 and 3.5s from start 20 -> segment 5.
+    chunks = chunking_service.chunk_transcript(_transcript(segments), scene_boundaries=[26.0])
+    assert chunks[1].start_time == segments[5].start_time
+    # Every timestamp in every chunk is a real segment boundary.
+    real_starts = {s.start_time for s in segments}
+    real_ends = {s.end_time for s in segments}
+    for chunk in chunks:
+        assert chunk.start_time in real_starts and chunk.end_time in real_ends
+
+
+def test_word_floor_stops_rapid_cuts_from_shredding_the_transcript(scene_settings, monkeypatch):
+    monkeypatch.setattr(settings, "chunk_min_words", 12)  # >= 3 segments
+    segments = [_segment(i) for i in range(20)]
+    every_segment = [5.0 * i + 2.5 for i in range(1, 20)]  # a "scene change" at every segment
+    chunks = chunking_service.chunk_transcript(_transcript(segments), scene_boundaries=every_segment)
+
+    assert len(chunks) > 1
+    assert all(c.word_count >= 12 for c in chunks)
+    assert sum(c.word_count for c in chunks) == 20 * 4  # nothing dropped or duplicated
+
+
+def test_word_ceiling_still_splits_a_long_scene(monkeypatch):
+    monkeypatch.setattr(settings, "chunk_target_words", 10)
+    monkeypatch.setattr(settings, "chunk_min_words", 8)
+    monkeypatch.setattr(settings, "frame_sample_interval_seconds", 5.0)
+    segments = [_segment(i) for i in range(20)]
+    # One scene boundary far away; the long scene before it must still split.
+    chunks = chunking_service.chunk_transcript(_transcript(segments), scene_boundaries=[92.5])
+    assert len(chunks) > 2
+    # Ceiling cuts keep the original overlap behaviour.
+    assert "seg2word0" in chunks[0].text and "seg2word0" in chunks[1].text
+
+
+def test_scene_cut_right_after_a_ceiling_cut_drops_the_carried_overlap(monkeypatch):
+    monkeypatch.setattr(settings, "chunk_target_words", 10)
+    monkeypatch.setattr(settings, "chunk_min_words", 4)
+    monkeypatch.setattr(settings, "frame_sample_interval_seconds", 5.0)
+    segments = [_segment(i) for i in range(6)]
+    # Ceiling hits after seg2 (12 words). Scene boundary maps to segment 3,
+    # so seg2 (before the change) must NOT be carried into the new scene.
+    chunks = chunking_service.chunk_transcript(_transcript(segments), scene_boundaries=[17.5])
+    assert chunks[0].end_time == segments[2].end_time
+    assert chunks[1].start_time == segments[3].start_time
+    assert "seg2word0" not in chunks[1].text
+
+
+def test_boundary_too_close_to_the_end_is_ignored(scene_settings):
+    segments = [_segment(i) for i in range(10)]
+    # Maps to the last segment: only 4 words remain (< 8 floor) -> no sliver chunk.
+    chunks = chunking_service.chunk_transcript(_transcript(segments), scene_boundaries=[47.5])
+    assert len(chunks) == 1
+
+
+def test_boundary_at_the_very_start_is_ignored(scene_settings):
+    segments = [_segment(i) for i in range(10)]
+    chunks = chunking_service.chunk_transcript(_transcript(segments), scene_boundaries=[1.0])
+    assert len(chunks) == 1
+
+
+def test_chunk_and_save_records_alignment_metadata(tmp_path, monkeypatch, scene_settings):
+    monkeypatch.setattr(settings, "chunks_dir", tmp_path)
+    segments = [_segment(i) for i in range(10)]
+    t = _transcript(segments)
+
+    aligned = chunking_service.chunk_and_save(t, scene_boundaries=[27.5, 1.0])
+    assert aligned.alignment == "scene_aligned"
+    assert aligned.scene_boundaries_available == 2
+    assert aligned.scene_cuts_applied == 1  # the boundary at t=1.0 maps to index 0 -> unused
+    assert chunking_service.get_chunk_set("vid1").alignment == "scene_aligned"
+
+    plain = chunking_service.chunk_and_save(t)
+    assert plain.alignment == "word_count"
+    assert plain.scene_cuts_applied == 0

@@ -410,3 +410,81 @@ complete. The visual pipeline is a full parallel of the text pipeline
   alignment is only as tight as the chunks. The coffee-cake video is indexed as 2
   chunks of ~200 s each, so almost any frame lands "inside" a chunk and the `both`
   match is loose. Chunk boundaries are word-count-driven, not content-driven.
+
+## Phase 6b — Scene-aware segmentation (SSIM + content-aligned chunking) (complete)
+
+Two changes, motivated by one observation: text chunks were cut every ~150
+words and frames were deduplicated with a raw pixel difference — neither knew
+what was actually on screen, so a chunk could straddle two slides.
+
+**1. SSIM scene detection** (`frame_service._ssim`, `_is_new_scene`).
+Structural Similarity (Wang et al. 2004; 11×11 Gaussian window, σ 1.5) compared
+against the last *saved* frame on the existing 64×64 grayscale copy — a frame is
+a new scene when SSIM < `frame_ssim_threshold` (0.6). Built on `cv2.GaussianBlur`
+(no new dependency) and verified against `skimage.metrics.structural_similarity`
+(max difference 6.6e-15 over 40 real frame pairs). `frame_diff_method` selects
+`"ssim"` (default) or `"mad"` (the old metric, kept as a benchmark baseline).
+Every saved frame after the first marks a scene change, exposed as
+`frame_service.get_scene_boundaries()`.
+
+**2. Content-aligned chunking** (`chunking_service`). When frames exist, scene
+boundaries become preferred chunk cuts: each boundary is mapped to the transcript
+segment whose start is nearest the estimated change time (boundary − half a
+sample interval), so timestamps stay exact. `chunk_target_words` (150) remains a
+ceiling; `chunk_min_words` (40) is a floor so rapid cuts cannot shred the
+transcript. A scene cut carries **no overlap** (overlap exists to protect ideas
+split by an *arbitrary* cut). With no frames — or `chunk_align_to_scenes=False` —
+behaviour is the original algorithm exactly. `ChunkSet` records `alignment`,
+`scene_boundaries_available` and `scene_cuts_applied`. The frontend adds an
+"Align text chunks to scenes" pipeline step and skips already-finished steps.
+
+### What the measurements actually showed (including where the plan was wrong)
+
+Reproduce with `backend/scripts/segmentation_benchmark.py` and
+`backend/scripts/retrieval_eval.py`.
+
+- **SSIM ≈ MAD at finding boundaries on this data.** On the 254 consecutive
+  CS101 sample pairs they disagree on 1. The differences in kept-frame counts
+  come from threshold choice, not from SSIM finding different scenes.
+- **SSIM's advantage is real but narrow.** A uniform +25 brightness shift scores
+  MAD 25 ("new scene") but SSIM 0.93 ("same"); the one real disagreement in the
+  data is the lecturer's name-caption overlay (MAD 15.1, SSIM 0.81) — correctly
+  *not* a new scene under SSIM.
+- **SSIM has a blind spot, found by a failing test:** between two *flat* frames
+  (black frame, plain title card) it has no structure to compare — a red→blue
+  solid cut scores 0.67, "same scene". Fixed with a narrow fallback: if both
+  frames are flat (gray std < 5), compare mean luminance (gap ≥ 20 = new scene).
+- **Correction to an earlier claim.** The 79–98% frame keep-rate on the news,
+  cooking and vlog videos was first read as pixel-difference noise that SSIM
+  would fix. It is not: consecutive samples 5 s apart have median SSIM ≈ 0.35
+  there, i.e. the shots genuinely change. The keep-rate reflects the content, and
+  SSIM keeps 63–89% on those videos depending on threshold.
+- **Aligned chunking makes MORE, smaller chunks, not fewer** (CS101: 20 → 39
+  chunks, 155 → 74 words each). The expected "leaner index" did not materialise;
+  the index is still tiny. The benefit is elsewhere (below).
+
+**Retrieval evaluation** (CS101, 18 questions whose answer spans were read off the
+transcript text — independent of both chunkers; hit = chunk covers ≥ 50% of the
+answer; MiniLM cosine ranking as in production):
+
+| Strategy | Chunks | Hit@1 | Hit@3 | MRR | Words sent to the LLM (top-5) |
+|---|---|---|---|---|---|
+| word-count, ceiling 150 (previous default) | 20 | 83% | 100% | 0.92 | 772 |
+| word-count, ceiling 75 (size-matched control) | 42 | 67% | 94% | 0.80 | 408 |
+| **scene-aligned** | 39 | **89%** | 100% | **0.94** | **365** |
+
+Reading it honestly: scene-aligned matches the old accuracy (the one-question gap
+over word-count@150 is within noise) while giving the LLM **about half the
+context** (365 vs 772 words); and against a plain-word-count control of the *same*
+chunk size it is clearly better (Hit@1 89% vs 67%, i.e. 16 vs 12 of 18). So the
+gain is not merely "smaller chunks". Limits: 18 questions, one video, labels
+written by the developer; answer *quality* with the smaller context was not
+measured; structural metrics from the segmentation benchmark (alignment rate,
+scene purity) are measured against the same boundaries the chunker follows and
+only confirm it does what it was built to do.
+
+**Known limitations:** comparison is on grayscale (a colour-only change is
+missed); boundaries are accurate to the 5 s sampling interval; frame extraction
+decodes sequentially and takes roughly real-time on CPU; on rapid-cut footage
+(cooking, vlog) the word floor dominates so aligned chunking degrades to
+word-count chunking by design.

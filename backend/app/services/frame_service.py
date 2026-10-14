@@ -7,9 +7,20 @@ Sampling strategy (deliberately NOT "extract every frame"):
      rarely change faster than a few seconds, so sampling more often
      would mostly just find duplicates of the same slide.
   2. Near-duplicate skip: each candidate is compared to the last SAVED
-     frame via mean absolute pixel difference on a small downsampled
-     grayscale copy. Below settings.frame_diff_threshold, it's treated
-     as the same slide/scene still on screen and skipped.
+     frame on a small downsampled grayscale copy. If it still looks like
+     the same scene it is skipped; otherwise it is saved AND marks a scene
+     change. "Looks like" is settings.frame_diff_method:
+       - "ssim" (default): structural similarity (Wang et al. 2004). Unlike
+         raw pixel difference it compares local luminance, contrast and
+         STRUCTURE, so a brightness/exposure shift or a small overlay (a
+         name caption) does not register as a new scene. New scene when
+         SSIM < settings.frame_ssim_threshold.
+       - "mad": mean absolute pixel difference, the original heuristic,
+         kept as a baseline for benchmarking. New scene when
+         MAD >= settings.frame_diff_threshold.
+  The saved frames therefore double as the video's scene boundaries
+  (frames[1:] timestamps) -- chunking_service uses those to align text
+  chunks to visual scenes.
 
 Uses OpenCV (not FFmpeg) because step 2 needs actual pixel arrays to
 compare -- FFmpeg extraction would mean writing every candidate frame
@@ -49,6 +60,62 @@ def _downsample_gray(frame: np.ndarray) -> np.ndarray:
 
 def _mean_abs_diff(a: np.ndarray, b: np.ndarray) -> float:
     return float(np.mean(np.abs(a.astype(np.int16) - b.astype(np.int16))))
+
+
+_SSIM_WINDOW = (11, 11)
+_SSIM_SIGMA = 1.5
+_SSIM_C1 = (0.01 * 255) ** 2
+_SSIM_C2 = (0.03 * 255) ** 2
+
+
+def _ssim(a: np.ndarray, b: np.ndarray) -> float:
+    """
+    Mean structural similarity between two equal-size grayscale images,
+    in [-1, 1] (1 = identical).
+
+    Standard Gaussian-window SSIM (11x11, sigma 1.5, K1=0.01, K2=0.03,
+    L=255) built on cv2.GaussianBlur so no extra dependency is needed.
+    The 5px border, where the window hangs off the image, is excluded --
+    the same "valid region" convention scikit-image uses. Checked against
+    skimage.metrics.structural_similarity: max difference ~1e-15 on 40
+    real frame pairs (tests/test_frame_service.py pins known values).
+    """
+    a = a.astype(np.float64)
+    b = b.astype(np.float64)
+
+    def blur(x: np.ndarray) -> np.ndarray:
+        return cv2.GaussianBlur(x, _SSIM_WINDOW, _SSIM_SIGMA)
+
+    mu_a, mu_b = blur(a), blur(b)
+    var_a = blur(a * a) - mu_a**2
+    var_b = blur(b * b) - mu_b**2
+    covariance = blur(a * b) - mu_a * mu_b
+    ssim_map = ((2 * mu_a * mu_b + _SSIM_C1) * (2 * covariance + _SSIM_C2)) / (
+        (mu_a**2 + mu_b**2 + _SSIM_C1) * (var_a + var_b + _SSIM_C2)
+    )
+    pad = _SSIM_WINDOW[0] // 2
+    return float(ssim_map[pad:-pad, pad:-pad].mean())
+
+
+def _is_flat(gray: np.ndarray) -> bool:
+    return float(gray.std()) < settings.frame_flat_std_threshold
+
+
+def _is_new_scene(candidate: np.ndarray, last_saved: np.ndarray) -> bool:
+    """Does this candidate frame look like a different scene than the last
+    saved one, under the configured metric?"""
+    if settings.frame_diff_method == "ssim":
+        if _is_flat(candidate) and _is_flat(last_saved):
+            # Nothing structural to compare (SSIM would be dominated by its
+            # constants) -- luminance is the only meaningful signal.
+            luminance_gap = abs(float(candidate.mean()) - float(last_saved.mean()))
+            return luminance_gap >= settings.frame_flat_luminance_threshold
+        return _ssim(candidate, last_saved) < settings.frame_ssim_threshold
+    if settings.frame_diff_method == "mad":
+        return _mean_abs_diff(candidate, last_saved) >= settings.frame_diff_threshold
+    raise ValueError(
+        f"Unknown frame_diff_method '{settings.frame_diff_method}'. Supported: 'ssim', 'mad'."
+    )
 
 
 def extract_frames(video_path: Path, video_id: str) -> FrameSet:
@@ -101,12 +168,11 @@ def extract_frames(video_path: Path, video_id: str) -> FrameSet:
                     timestamp = frame_index / fps
                     candidate_gray = _downsample_gray(bgr_frame)
 
-                    is_duplicate = (
-                        last_saved_gray is not None
-                        and _mean_abs_diff(candidate_gray, last_saved_gray) < settings.frame_diff_threshold
+                    is_new_scene = last_saved_gray is None or _is_new_scene(
+                        candidate_gray, last_saved_gray
                     )
 
-                    if not is_duplicate:
+                    if is_new_scene:
                         frame_id = f"{video_id}_{saved_count:04d}"
                         image_filename = f"frame_{saved_count:04d}.jpg"
                         image_path = frame_dir / image_filename
@@ -135,17 +201,23 @@ def extract_frames(video_path: Path, video_id: str) -> FrameSet:
         video_id=video_id,
         created_at=datetime.now(timezone.utc),
         sample_interval_seconds=settings.frame_sample_interval_seconds,
-        diff_threshold=settings.frame_diff_threshold,
+        diff_threshold=(
+            settings.frame_ssim_threshold
+            if settings.frame_diff_method == "ssim"
+            else settings.frame_diff_threshold
+        ),
+        diff_method=settings.frame_diff_method,
         frames=frames,
     )
     _manifest_path(video_id).write_text(frame_set.model_dump_json(indent=2), encoding="utf-8")
 
     logger.info(
-        "Extracted %d frames for %s (%d candidates checked, interval=%.1fs)",
+        "Extracted %d frames for %s (%d candidates checked, interval=%.1fs, method=%s)",
         saved_count,
         video_id,
         candidates_checked,
         settings.frame_sample_interval_seconds,
+        settings.frame_diff_method,
     )
     return frame_set
 
@@ -155,6 +227,23 @@ def get_frame_set(video_id: str) -> Optional[FrameSet]:
     if not path.exists():
         return None
     return FrameSet.model_validate_json(path.read_text(encoding="utf-8"))
+
+
+def get_scene_boundaries(video_id: str) -> Optional[List[float]]:
+    """
+    Timestamps (seconds) at which a new visual scene begins, or None if
+    this video has no extracted frames.
+
+    Every saved frame after the first marks a scene change: it is the
+    first sampled frame that no longer looked like the previous saved one.
+    The true change happened somewhere in the preceding sample interval,
+    so a boundary is accurate to settings.frame_sample_interval_seconds.
+    The first frame (t ~ 0) is the start of the video, not a boundary.
+    """
+    frame_set = get_frame_set(video_id)
+    if frame_set is None:
+        return None
+    return [f.timestamp for f in frame_set.frames[1:]]
 
 
 def get_frame_image_path(video_id: str, frame_id: str) -> Path:

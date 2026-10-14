@@ -14,9 +14,27 @@ const TEXT_STEPS = [
 ];
 
 const VISUAL_STEPS = [
-  { key: "frames", label: "Extract frames", run: (id) => api.extractFrames(id) },
+  { key: "frames", label: "Extract frames (SSIM scenes)", run: (id) => api.extractFrames(id) },
   { key: "embedFrames", label: "Embed frames (CLIP)", run: (id) => api.embedFrames(id) },
   { key: "indexFrames", label: "Index frames into vector DB", run: (id) => api.indexFrames(id) },
+  {
+    // Chunking is aligned to the scene changes found above, so if the
+    // transcript was already chunked (before frames existed) it has to be
+    // redone. With no transcript yet there is nothing to align: the chunk
+    // step will pick the frames up whenever the text pipeline runs.
+    key: "align",
+    label: "Align text chunks to scenes",
+    run: async (id) => {
+      try {
+        await api.getTranscript(id);
+      } catch {
+        return;
+      }
+      await api.chunk(id);
+      await api.embed(id);
+      await api.index(id);
+    },
+  },
 ];
 
 function StepRow({ label, status, error }) {
@@ -42,11 +60,13 @@ export default function PipelineStatus({ video, onUpdated }) {
     let cancelled = false;
     async function probe() {
       const next = {};
+      let chunkAlignment = null; // null = not chunked yet
       try {
         await api.getTranscript(video.video_id);
         next.transcribe = "done";
         try {
-          await api.getChunks(video.video_id);
+          const chunkSet = await api.getChunks(video.video_id);
+          chunkAlignment = chunkSet.alignment;
           next.chunk = "done";
           next.embed = "done"; // chunks existing implies embed+index were attempted together in this UI
           next.index = "done";
@@ -64,6 +84,9 @@ export default function PipelineStatus({ video, onUpdated }) {
         nextVisual.frames = "done";
         nextVisual.embedFrames = "done";
         nextVisual.indexFrames = "done";
+        // Aligned if chunks already follow the scenes, or if there are no
+        // chunks yet (they will be aligned when created).
+        if (chunkAlignment === null || chunkAlignment === "scene_aligned") nextVisual.align = "done";
       } catch {
         /* not frame-extracted yet */
       }
@@ -75,9 +98,10 @@ export default function PipelineStatus({ video, onUpdated }) {
     };
   }, [video.video_id]);
 
-  async function runPipeline(steps, setStatus, setRunning) {
+  async function runPipeline(steps, currentStatus, setStatus, setRunning) {
     setRunning(true);
     for (const step of steps) {
+      if (currentStatus[step.key] === "done") continue; // don't redo finished (slow) steps
       setStatus((prev) => ({ ...prev, [step.key]: "running" }));
       try {
         await step.run(video.video_id);
@@ -108,7 +132,7 @@ export default function PipelineStatus({ video, onUpdated }) {
           <div className="pipeline-column-header">
             <h3>Text pipeline</h3>
             <button
-              onClick={() => runPipeline(TEXT_STEPS, setTextStatus, setTextRunning)}
+              onClick={() => runPipeline(TEXT_STEPS, textStatus, setTextStatus, setTextRunning)}
               disabled={textRunning || allTextDone}
             >
               {allTextDone ? "Done" : textRunning ? "Running…" : "Run"}
@@ -125,7 +149,7 @@ export default function PipelineStatus({ video, onUpdated }) {
           <div className="pipeline-column-header">
             <h3>Visual pipeline</h3>
             <button
-              onClick={() => runPipeline(VISUAL_STEPS, setVisualStatus, setVisualRunning)}
+              onClick={() => runPipeline(VISUAL_STEPS, visualStatus, setVisualStatus, setVisualRunning)}
               disabled={visualRunning || allVisualDone}
             >
               {allVisualDone ? "Done" : visualRunning ? "Running…" : "Run"}

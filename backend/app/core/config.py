@@ -111,6 +111,16 @@ class Settings(BaseSettings):
     # the next chunk, so ideas that span a chunk boundary still appear in
     # both chunks' embeddings.
     chunk_overlap_segments: int = 1
+    # Content-aligned chunking: when a video's frames have been extracted,
+    # the scene changes found there become preferred chunk boundaries, so a
+    # chunk tends to cover ONE visual scene instead of straddling two.
+    # chunk_target_words stays as a hard ceiling (a long scene is still
+    # split); chunk_min_words is a floor so rapid cuts (cooking/vlog
+    # footage, where a "scene" lasts a few seconds) can't shred the
+    # transcript into tiny chunks -- on such footage the floor dominates and
+    # behaviour gracefully falls back to plain word-count chunking.
+    chunk_align_to_scenes: bool = True
+    chunk_min_words: int = 40
 
     # --- Text embeddings (Sentence-Transformers) ---
     # A small (384-dim), fast, general-purpose model -- the right
@@ -163,6 +173,27 @@ class Settings(BaseSettings):
     # actually be measured (Phase 10), not derived from any formal study.
     frame_diff_threshold: float = 10.0
     frame_diff_downsample_size: tuple[int, int] = (64, 64)
+    # Which metric decides "is this a new scene": "ssim" (structural
+    # similarity -- robust to brightness/contrast shifts and to small
+    # overlays like a name caption; a frame is a NEW scene when its SSIM
+    # against the last saved frame falls BELOW frame_ssim_threshold) or
+    # "mad" (the original mean-absolute-pixel-difference, kept as a
+    # selectable baseline so the two can be benchmarked against each
+    # other -- see backend/scripts/segmentation_benchmark.py).
+    frame_diff_method: str = "ssim"
+    # Chosen from measurement, not a paper default: on 4 real videos the
+    # consecutive-sample SSIM distribution is bimodal (same slide ~0.85-1.0,
+    # new shot ~0.1-0.5), and 0.6 sits in the gap. MAD>=10 on the same
+    # lecture lands at a similar keep rate (31% vs 26%).
+    frame_ssim_threshold: float = 0.6
+    # SSIM measures STRUCTURE, so it is blind to a cut between two frames
+    # that have none (black frame, plain title card, solid background):
+    # red -> blue solid frames score SSIM ~0.67, i.e. "same scene". When
+    # BOTH frames are flat (gray std below this), fall back to comparing
+    # mean luminance instead (new scene if it differs by at least
+    # frame_flat_luminance_threshold gray levels).
+    frame_flat_std_threshold: float = 5.0
+    frame_flat_luminance_threshold: float = 20.0
     frame_jpeg_quality: int = 85
 
     # --- Visual embeddings (CLIP, Phase 5 Step 2) ---
