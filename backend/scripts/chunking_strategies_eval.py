@@ -82,7 +82,7 @@ def main():
     q_videos = spec["videos"]
     questions = [(q_videos[v], q, a, b) for v, q, a, b, _ in spec["questions"]]
 
-    chapter_videos = {vid: (key, truth) for key, vid, truth in load_videos()}
+    chapter_videos = {vid: (key + ("" if prov == "creator" else "*"), truth) for key, vid, truth, prov in load_videos()}
     all_ids = sorted(set(chapter_videos) | set(q_videos.values()))
 
     prepared = {}
@@ -97,7 +97,7 @@ def main():
     print("boundaries (scene-ssim / topic):", {vid[:6]: (len(prepared[vid][1]), len(prepared[vid][2])) for vid in all_ids}, "\n")
 
     # ---------------- 1. chapter purity
-    print("=== chapter purity (higher = chunks stay inside one creator chapter) ===")
+    print("=== chapter purity (higher = chunks stay inside one chapter; * = chapters unverified/auto-generated) ===")
     header = f"{'strategy':13}" + "".join(f"{chapter_videos[v][0]:>15}" for v in chapter_videos) + f"{'mean':>8}   chunks/video"
     print(header)
     for s in STRATEGIES:

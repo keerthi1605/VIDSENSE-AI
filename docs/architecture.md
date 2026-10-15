@@ -590,34 +590,52 @@ vlog (n=13) **31%** vs 69% / 54%. The 22-point advantage shrank to ~2 questions 
 and on rapid-cut footage scene alignment clearly *hurts*. Cooking (n=6) and news (n=5) are
 too small to read.
 
-**2. Boundaries vs creator chapter markers** (`scripts/boundary_eval.py`; 4 videos, 35
-human-made chapter boundaries; F1 at +/-15 s; creator chapters are independent ground
-truth, unlike the earlier purity metric):
+**2. Boundaries vs YouTube chapter markers** (`scripts/boundary_eval.py`; F1 at +/-15 s).
 
-| Signal | Macro F1 |
-|---|---|
-| random, same count as hybrid | 0.260 |
-| scene-SSIM / scene-MAD / PySceneDetect (visual) | 0.144 / 0.185 / 0.193 |
-| speech pauses | 0.067 |
-| fixed 60 s windows | 0.359 |
-| topic shift (transcript only) | 0.372 |
-| hybrid visual+topic+pause (settings tuned leave-one-video-out) | 0.383 |
+*Provenance correction.* An earlier version of this section called every chapter list
+"creator-published human ground truth". That was **wrong**: parsing each video's
+description showed that only some chapters are creator-written timestamps (Indently,
+Tarzia CS-310, Paint Explainer). The rest (Core Dumped, Telusko, TED explainer, the
+Networks lecture, Soper, Neso, EECS2011) have no timestamps in the description, so they are
+most likely **YouTube's auto-generated chapters** -- machine-made, possibly derived from
+the transcript, which would favour text-based signals. `chapters.json` now records
+`provenance` per video and the evaluation reports the two groups separately.
 
-Visual detectors fire 62-84 times where creators marked 5-19 chapters (animated explainer,
-screencasts) and score *below chance*; the hybrid is essentially the topic signal (tuning
-gave the visual signal zero weight in 2 of 4 held-out folds). At +/-30 s fixed 60 s windows
-win (0.63) simply because chapters are ~60-100 s apart and the tolerance is generous --
-the +/-15 s row is the meaningful one. Chapter *purity* of scene-aligned chunks equals that
-of size-matched word-count chunks (0.949 vs 0.946): the "purity" gain reported earlier was
-a chunk-size effect.
+| Macro F1, +/-15 s | creator-verified (1 video: Indently-30, 19 boundaries) | unverified/auto labels (4 videos, 23 boundaries) |
+|---|---|---|
+| random, same count as hybrid | 0.283 | 0.237 |
+| fixed 60 s windows | 0.245 | 0.349 |
+| scene-MAD (visual) | 0.370 | 0.204 |
+| scene-SSIM (visual) | 0.296 | 0.166 |
+| PySceneDetect (visual) | 0.375 | 0.100 |
+| speech pauses | 0.000 | 0.098 |
+| topic shift (transcript only) | 0.417 | 0.386 |
+| hybrid visual+topic+pause (leave-one-video-out) | 0.426 | 0.349 |
 
-**Conclusion.** On these videos (animated explainer, code screencasts, talking-head
-lecture, vlog) visual scene boundaries are **not** a reliable chunking signal and
-scene-aligned chunking is **not** better than plain word-count chunking; it is clearly
-worse on rapid-cut footage. Text topic shifts are the most reliable boundary signal found,
-but gave no retrieval gain over plain chunks either. Untested: slide/board lectures, where
-visual cuts may track topic changes. `settings.chunk_align_to_scenes` is therefore a
-candidate to default OFF; the stored indexes of the four demo videos are still scene-aligned.
+Per video (unverified labels, F1 at +/-15 s): the **slide lecture** (Computer Networks L1)
+-- scene-MAD 0.44, scene-SSIM 0.38, topic 0.48, hybrid 0.34, fixed 0.21, random 0.19
+(PySceneDetect found no cuts at all there); the animated explainer, Telusko and Core Dumped
+-- scene-SSIM 0.12 / 0.00 / 0.16 against random 0.28 / 0.21 / 0.26, with visual detectors
+firing 62-84 times against 5-7 chapters.
+
+**What this supports, honestly.** Visual boundaries look **style-dependent**: clearly above
+chance on the slide lecture (0.38-0.44 vs 0.19) and the verified code screencast (0.30-0.37
+vs 0.28), at or below chance on animated/fast-cut footage where they over-segment. In no
+video do they beat the transcript topic signal, and the hybrid never beat its best single
+signal. The caveats are large: only ONE video has verified human labels, the slide-lecture
+labels are unverified, and the topic signal's lead may be inflated if auto-chapters were
+derived from transcripts. At +/-30 s fixed 60 s windows win (0.57-0.61) simply because
+chapters are ~60-100 s apart and the tolerance is generous -- the +/-15 s rows are the
+meaningful ones. Chapter *purity* of scene-aligned chunks equals that of size-matched
+word-count chunks (0.949 vs 0.946; mixed-provenance labels): the "purity" gain reported
+earlier was a chunk-size effect.
+
+**Conclusion.** Scene-aligned chunking is **not** better than plain word-count chunking for
+retrieval on the 57 questions, and clearly worse on rapid-cut footage. Whether visual
+boundaries help on slide lectures specifically is **still open**: the boundary evidence is
+encouraging but weakly labelled, and no retrieval questions exist yet for the slide
+lecture. `settings.chunk_align_to_scenes` is a candidate to default OFF; the stored indexes
+of the four demo videos are still scene-aligned.
 
 **3. A positive result — citation localization** (`scripts/localization_eval.py`; 57
 questions; full retrieval stack). Jumping to the start of the cited chunk can leave the

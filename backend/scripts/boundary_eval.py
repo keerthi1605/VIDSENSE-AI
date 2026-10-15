@@ -5,10 +5,16 @@ Run from backend/:
 
     HF_HUB_DISABLE_XET=1 venv/Scripts/python.exe scripts/boundary_eval.py
 
-Ground truth = the chapter markers the VIDEO'S CREATOR published
-(scripts/eval_data/chapters.json) -- human-made topic boundaries that no
-algorithm in this repo produced, so scoring against them is not circular
-(unlike the alignment/purity numbers in segmentation_benchmark.py).
+Ground truth = YouTube chapter markers (scripts/eval_data/chapters.json), each
+tagged with its PROVENANCE:
+  creator     timestamps written in the video description -- verified by parsing
+              it; genuine human-made topic boundaries no algorithm here produced.
+  unverified  no timestamps in the description, so most likely YouTube's
+              AUTO-GENERATED chapters: machine-made, possibly derived from the
+              transcript (which would favour text-based signals). Weak labels.
+Results are therefore printed for CREATOR-verified videos (the numbers to trust)
+and for ALL videos (weak). An earlier version of this script treated every
+chapter as creator-written; that was wrong for most of the videos.
 
 Methods (each returns boundary timestamps in seconds)
   fixed-60s     a boundary every 60 s            (the fixed-window baseline)
@@ -68,7 +74,7 @@ def load_videos():
         vid = by_youtube.get(key)
         if vid and transcription_service.get_transcript(vid):
             truth = [c["start"] for c in info["chapters"] if c["start"] > 0]
-            videos.append((key, vid, truth))
+            videos.append((key, vid, truth, info.get("provenance", "unverified")))
     return videos
 
 
@@ -176,10 +182,11 @@ HYBRID_GRID = list(itertools.product(
 
 def main():
     videos = load_videos()
-    print("videos:", ", ".join(f"{k} ({len(t)} chapter boundaries)" for k, _, t in videos), "\n")
+    print("videos:", ", ".join(f"{k} ({len(t)} boundaries, {p})" for k, _, t, p in videos), "\n")
+    provenance = {key: prov for key, _, _, prov in videos}
 
     per_video = {}
-    for key, vid, truth in videos:
+    for key, vid, truth, _ in videos:
         segs = transcription_service.get_transcript(vid).segments
         path = video_service.get_video_file_path(vid)
         grays, stamps = sample_frames(path)
@@ -223,26 +230,32 @@ def main():
         per_video[key]["random_n"] = n
 
     method_names = ["fixed-60s", "scene-mad", "scene-ssim", "pyscenedetect", "topic", "pause", "hybrid", "random"]
-    for tol in TOLERANCES:
-        print(f"=== tolerance +/-{tol:.0f}s  (precision / recall / F1) ===")
-        print(f"{'method':14}" + "".join(f"{k:>26}" for k in keys) + f"{'macro F1':>11}")
-        for name in method_names:
-            cells, f1s = [], []
-            for key in keys:
-                pv = per_video[key]
-                truth, dur = pv["truth"], pv["duration"]
-                if name == "random":
-                    runs = [prf([rng.uniform(0, dur) for _ in range(pv["random_n"])], truth, tol) for _ in range(300)]
-                    p, r, f = (float(np.mean([x[j] for x in runs])) for j in range(3))
-                    count = pv["random_n"]
-                else:
-                    pred = pv["methods"][name]
-                    p, r, f = prf(pred, truth, tol)
-                    count = len(pred)
-                cells.append(f"{count:>3}b {p:>4.0%}/{r:>4.0%}/{f:>4.2f}".rjust(26))
-                f1s.append(f)
-            print(f"{name:14}" + "".join(cells) + f"{np.mean(f1s):>11.3f}")
-        print()
+    def print_tables(subset, label):
+        if not subset:
+            return
+        for tol in TOLERANCES:
+            print(f"=== {label} | tolerance +/-{tol:.0f}s  (boundaries, precision/recall/F1) ===")
+            print(f"{'method':14}" + "".join(f"{k:>26}" for k in subset) + f"{'macro F1':>11}")
+            for name in method_names:
+                cells, f1s = [], []
+                for key in subset:
+                    pv = per_video[key]
+                    truth, dur = pv["truth"], pv["duration"]
+                    if name == "random":
+                        runs = [prf([rng.uniform(0, dur) for _ in range(pv["random_n"])], truth, tol) for _ in range(300)]
+                        p, r, f = (float(np.mean([x[j] for x in runs])) for j in range(3))
+                        count = pv["random_n"]
+                    else:
+                        pred = pv["methods"][name]
+                        p, r, f = prf(pred, truth, tol)
+                        count = len(pred)
+                    cells.append(f"{count:>3}b {p:>4.0%}/{r:>4.0%}/{f:>4.2f}".rjust(26))
+                    f1s.append(f)
+                print(f"{name:14}" + "".join(cells) + f"{np.mean(f1s):>11.3f}")
+            print()
+
+    print_tables([k for k in keys if provenance[k] == "creator"], "CREATOR-VERIFIED chapters (trust these)")
+    print_tables([k for k in keys if provenance[k] != "creator"], "UNVERIFIED / likely auto-generated chapters (weak labels)")
 
     print("hybrid settings chosen when each video was held out (weights visual,topic,pause | threshold):")
     for key in keys:

@@ -1,5 +1,5 @@
 {
-  "_note": "Creator-published chapter markers (start second + title), fetched as metadata with yt-dlp. Used ONLY as an independent human-made topic-boundary ground truth; no video or transcript content is stored here.",
+  "_note": "Chapter markers fetched as metadata with yt-dlp. 'provenance' says who wrote them: 'creator' = timestamps written in the video description (verified by parsing it); 'unverified' = no timestamps in the description, so they are most likely YouTube's auto-generated chapters (machine-made, possibly derived from the transcript) and must NOT be treated as human ground truth. No video or transcript content is stored here.",
   "videos": {
     "core-dumped": {
       "youtube_id": "HjneAhCy2N4",
@@ -39,7 +39,8 @@
           "start": 807,
           "title": "Arithmetic logic unit overview"
         }
-      ]
+      ],
+      "provenance": "unverified"
     },
     "indently-30": {
       "youtube_id": "Ro_MScTDfU4",
@@ -127,7 +128,8 @@
           "start": 1831,
           "title": "Bye bye"
         }
-      ]
+      ],
+      "provenance": "creator"
     },
     "telusko": {
       "youtube_id": "8O5kX73OkIY",
@@ -155,7 +157,8 @@
           "start": 305,
           "title": "Create Your Own Class"
         }
-      ]
+      ],
+      "provenance": "unverified"
     },
     "indently-oop": {
       "youtube_id": "rLyYb7BFgQI",
@@ -195,7 +198,8 @@
           "start": 1021,
           "title": "Conclusion"
         }
-      ]
+      ],
+      "provenance": "creator"
     },
     "paint-explainer": {
       "youtube_id": "OdziYWEkDIM",
@@ -243,7 +247,8 @@
           "start": 183,
           "title": "Wireless Card"
         }
-      ]
+      ],
+      "provenance": "creator"
     },
     "explainer-ted": {
       "youtube_id": "EMbZ72cCAzI",
@@ -275,7 +280,314 @@
           "start": 471,
           "title": "The art of explanation"
         }
-      ]
+      ],
+      "provenance": "unverified"
+    },
+    "networks-l1": {
+      "youtube_id": "GAg9DRZtPwY",
+      "title": "Computer Networks  - L1 (KTU BTech CSE , CS306, CST286 CST 303 )",
+      "channel": "Bisna Suresh",
+      "duration_s": 1360,
+      "chapters": [
+        {
+          "start": 0,
+          "title": "Components of a network"
+        },
+        {
+          "start": 172,
+          "title": "Transmission media types"
+        },
+        {
+          "start": 260,
+          "title": "Interconnecting devices"
+        },
+        {
+          "start": 325,
+          "title": "Network classification by area"
+        },
+        {
+          "start": 463,
+          "title": "Network connection types"
+        },
+        {
+          "start": 603,
+          "title": "Mesh and star topologies"
+        },
+        {
+          "start": 839,
+          "title": "Bus topology"
+        },
+        {
+          "start": 1106,
+          "title": "Ring and hybrid topologies"
+        }
+      ],
+      "provenance": "unverified"
+    },
+    "soper-db1": {
+      "youtube_id": "4Z9KEBexzcM",
+      "title": "Database Lesson #1 of 8 - Introduction to Databases",
+      "channel": "Dr. Daniel Soper",
+      "duration_s": 2322,
+      "chapters": [
+        {
+          "start": 0,
+          "title": "Introduction"
+        },
+        {
+          "start": 30,
+          "title": "Objectives"
+        },
+        {
+          "start": 100,
+          "title": "Purpose of a Database"
+        },
+        {
+          "start": 235,
+          "title": "List of Data"
+        },
+        {
+          "start": 444,
+          "title": "Data Anomalies"
+        },
+        {
+          "start": 715,
+          "title": "Complex Relationships"
+        },
+        {
+          "start": 769,
+          "title": "Relational Database"
+        },
+        {
+          "start": 909,
+          "title": "Join Operation"
+        },
+        {
+          "start": 1011,
+          "title": "Relational Databases"
+        },
+        {
+          "start": 1076,
+          "title": "Structured Query Language"
+        },
+        {
+          "start": 1244,
+          "title": "SELECT Statement Example"
+        },
+        {
+          "start": 1375,
+          "title": "Conceptual Information"
+        },
+        {
+          "start": 1537,
+          "title": "Database Users"
+        },
+        {
+          "start": 1569,
+          "title": "Metadata"
+        },
+        {
+          "start": 1647,
+          "title": "Overhead Data"
+        },
+        {
+          "start": 1713,
+          "title": "DBMS"
+        },
+        {
+          "start": 1925,
+          "title": "Database Applications"
+        },
+        {
+          "start": 1970,
+          "title": "Personal Database Systems"
+        },
+        {
+          "start": 2069,
+          "title": "Enterprise Level Database Systems"
+        },
+        {
+          "start": 2269,
+          "title": "Conclusion"
+        }
+      ],
+      "provenance": "unverified"
+    },
+    "tarzia-cs310": {
+      "youtube_id": "XNCahxAk7og",
+      "title": "CS-310 Lecture 01 - Types of Scaling",
+      "channel": "Steve Tarzia",
+      "duration_s": 2664,
+      "chapters": [
+        {
+          "start": 0,
+          "title": "<Untitled Chapter 1>"
+        },
+        {
+          "start": 13,
+          "title": "Gaps in traditional CS curriculum"
+        },
+        {
+          "start": 188,
+          "title": "What you’ll learn in this class"
+        },
+        {
+          "start": 319,
+          "title": "Topics we’ll cover"
+        },
+        {
+          "start": 487,
+          "title": "What you will not learn"
+        },
+        {
+          "start": 585,
+          "title": "Today's introduction"
+        },
+        {
+          "start": 612,
+          "title": "Traditional view of Software Scalability"
+        },
+        {
+          "start": 715,
+          "title": "Services vs Programs"
+        },
+        {
+          "start": 861,
+          "title": "Defining Service Scalability"
+        },
+        {
+          "start": 885,
+          "title": "Roughly speaking, a service is scalable if it can..."
+        },
+        {
+          "start": 964,
+          "title": "Scaling Challenges"
+        },
+        {
+          "start": 1309,
+          "title": "Vertical Scaling"
+        },
+        {
+          "start": 1453,
+          "title": "COMP_ENG 101: What affects computer performance?"
+        },
+        {
+          "start": 1646,
+          "title": "Parallelism within a machine"
+        },
+        {
+          "start": 1795,
+          "title": "Apache web server example"
+        },
+        {
+          "start": 1946,
+          "title": "Cloud Computing makes scaling easier"
+        },
+        {
+          "start": 2232,
+          "title": "Vertical Scaling pros and cons"
+        },
+        {
+          "start": 2562,
+          "title": "Horizontal Scaling is needed for global apps"
+        },
+        {
+          "start": 2593,
+          "title": "Recap"
+        }
+      ],
+      "provenance": "creator"
+    },
+    "neso-os": {
+      "youtube_id": "vBURTt97EkA",
+      "title": "Introduction to Operating Systems",
+      "channel": "Neso Academy",
+      "duration_s": 1005,
+      "chapters": [
+        {
+          "start": 0,
+          "title": "Introduction"
+        },
+        {
+          "start": 140,
+          "title": "Computer Hardware"
+        },
+        {
+          "start": 230,
+          "title": "Computer Software"
+        },
+        {
+          "start": 328,
+          "title": "Web Browser"
+        },
+        {
+          "start": 494,
+          "title": "Operating System"
+        },
+        {
+          "start": 684,
+          "title": "Types and Functions"
+        }
+      ],
+      "provenance": "unverified"
+    },
+    "eecs2011": {
+      "youtube_id": "W72p2FTwaOg",
+      "title": "[HD] EECS2011 W22 - Lecture 1 - Part A1 - Resources, Algorithm vs. Data Structures",
+      "channel": "Jackie Wang",
+      "duration_s": 1436,
+      "chapters": [
+        {
+          "start": 0,
+          "title": "Introduction"
+        },
+        {
+          "start": 56,
+          "title": "Resources"
+        },
+        {
+          "start": 308,
+          "title": "Learning Outcomes"
+        },
+        {
+          "start": 491,
+          "title": "Algorithm vs Data Structures"
+        },
+        {
+          "start": 1000,
+          "title": "Algorithm Measurements"
+        },
+        {
+          "start": 1200,
+          "title": "Efficiency"
+        }
+      ],
+      "provenance": "unverified"
+    },
+    "neso-dbms": {
+      "youtube_id": "6Iu45VZGQDk",
+      "title": "Introduction to Database Management Systems",
+      "channel": "Neso Academy",
+      "duration_s": 662,
+      "chapters": [
+        {
+          "start": 0,
+          "title": "Introduction"
+        },
+        {
+          "start": 69,
+          "title": "Basic Definitions"
+        },
+        {
+          "start": 365,
+          "title": "Properties"
+        },
+        {
+          "start": 445,
+          "title": "Illustration"
+        }
+      ],
+      "provenance": "unverified"
     }
   }
 }

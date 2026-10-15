@@ -1,0 +1,11 @@
+from app.services import (audio_service, chunking_service, embedding_service, retrieval_service,
+                          transcription_service, video_service)
+m = video_service.save_video_from_url("https://www.youtube.com/watch?v=GAg9DRZtPwY")
+print(f"downloaded {m.video_id} | {m.original_filename} | {m.size_bytes/1e6:.1f} MB", flush=True)
+audio = audio_service.extract_audio(video_service.get_video_file_path(m.video_id), m.video_id)
+tr = transcription_service.transcribe_and_save(m.video_id, audio)
+video_service.update_video_status(m.video_id, "transcribed")
+cs = chunking_service.chunk_and_save(tr)
+em = embedding_service.embed_and_save(cs)
+retrieval_service.index_video(cs, em)
+print(f"[done] {tr.duration_seconds:.0f}s, {len(tr.segments)} segs, {sum(len(s.text.split()) for s in tr.segments)} words, {len(cs.chunks)} chunks", flush=True)
