@@ -47,6 +47,7 @@ class Settings(BaseSettings):
     transcripts_dir: Path = storage_dir / "transcripts"
     embeddings_dir: Path = storage_dir / "embeddings"
     chunks_dir: Path = storage_dir / "chunks"
+    summaries_dir: Path = storage_dir / "summaries"
 
     # --- Upload constraints (Phase 1) ---
     max_upload_size_mb: int = 1024  # 1 GB ceiling, revisit later
@@ -157,6 +158,14 @@ class Settings(BaseSettings):
     ollama_base_url: str = "http://localhost:11434"
     ollama_model: str = "qwen2.5:3b"
     llm_request_timeout_seconds: int = 120
+
+    # --- Video summary / key points ---
+    # The transcript is split into sections of about this many words; each
+    # section gets one LLM call for its key point, and one more call writes
+    # the overview from those key points. A long video widens the sections
+    # rather than adding calls, so generation time stays bounded on CPU.
+    summary_section_words: int = 350
+    summary_max_sections: int = 10
     # How many top search results get passed to the LLM as context.
     rag_context_chunks: int = 5
 
@@ -267,6 +276,7 @@ class Settings(BaseSettings):
             self.transcripts_dir,
             self.embeddings_dir,
             self.chunks_dir,
+            self.summaries_dir,
         ):
             d.mkdir(parents=True, exist_ok=True)
 

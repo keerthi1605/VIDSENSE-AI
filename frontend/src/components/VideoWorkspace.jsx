@@ -5,6 +5,7 @@ import ChatPanel from "./ChatPanel";
 import SearchPanel from "./SearchPanel";
 import VisualSearchPanel from "./VisualSearchPanel";
 import MultimodalSearchPanel from "./MultimodalSearchPanel";
+import SummaryPanel from "./SummaryPanel";
 
 function formatTime(seconds) {
   const total = Math.floor(seconds);
@@ -40,6 +41,9 @@ export default function VideoWorkspace({ video }) {
             <button className={tab === "chat" ? "tab active" : "tab"} onClick={() => setTab("chat")}>
               Ask
             </button>
+            <button className={tab === "summary" ? "tab active" : "tab"} onClick={() => setTab("summary")}>
+              Summary
+            </button>
             <button className={tab === "search" ? "tab active" : "tab"} onClick={() => setTab("search")}>
               Search transcript
             </button>
@@ -51,6 +55,7 @@ export default function VideoWorkspace({ video }) {
             </button>
           </div>
           {tab === "chat" && <ChatPanel video={video} onSeek={seekTo} formatTime={formatTime} />}
+          {tab === "summary" && <SummaryPanel video={video} onSeek={seekTo} formatTime={formatTime} />}
           {tab === "search" && <SearchPanel video={video} onSeek={seekTo} formatTime={formatTime} />}
           {tab === "visual" && <VisualSearchPanel video={video} onSeek={seekTo} formatTime={formatTime} />}
           {tab === "fused" && <MultimodalSearchPanel video={video} onSeek={seekTo} formatTime={formatTime} />}

@@ -44,6 +44,7 @@ def delete_video(video_id: str) -> Dict[str, int]:
         settings.videos_dir / f"{video_id}.json",
         settings.transcripts_dir / f"{video_id}.json",
         settings.chunks_dir / f"{video_id}.json",
+        settings.summaries_dir / f"{video_id}.json",
         settings.embeddings_dir / f"{video_id}.npy",
         settings.embeddings_dir / f"{video_id}.json",
         settings.embeddings_dir / f"{video_id}_frames.npy",

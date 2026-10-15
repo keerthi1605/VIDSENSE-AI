@@ -1,0 +1,28 @@
+{
+  "video_id": "4eaeeb0e024346d2824c7eba72d2cb5c",
+  "created_at": "2026-10-15T11:23:12.394635Z",
+  "model": "qwen2.5:3b",
+  "overview": "Gilbert explores how our mental simulator in the prefrontal cortex can lead to mistaken predictions, which can be corrected by staying curious and critical. He then introduces the \"experience simulator,\" demonstrating that lottery winners and paraplegics can be equally happy, suggesting our expectations for big life events are often overly inflated. Using metaphors, Gilbert explains that like our immune system protects us, our mental resilience can maintain happiness, and he breaks down complex ideas into easier-to-grasp concepts.",
+  "key_points": [
+    {
+      "start_time": 6.8,
+      "end_time": 141.9,
+      "text": "The prefrontal cortex acts like a mental simulator that lets us predict outcomes before we act, which can lead to mistakes if we don't stay curious and think critically."
+    },
+    {
+      "start_time": 142.16,
+      "end_time": 274.26,
+      "text": "Gilbert explains an \"experience simulator\" concept, then shows how lottery winners and paraplegics are equally happy, creating a surprising knowledge gap for his audience."
+    },
+    {
+      "start_time": 274.8,
+      "end_time": 424.23,
+      "text": "Gilbert's research reveals that our expectations of big life events are often exaggerated, and happiness can be maintained through our mental resilience, much like the immune system protects our bodies."
+    },
+    {
+      "start_time": 424.89,
+      "end_time": 562.84,
+      "text": "Gilbert explained complex ideas by breaking them down into smaller, easier-to-understand parts using metaphors and examples."
+    }
+  ]
+}

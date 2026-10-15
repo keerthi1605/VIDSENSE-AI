@@ -708,3 +708,28 @@ faster, and on the news clip the sampled frames differed (mean absolute pixel di
 6.25, max 85.6) because seeks land on the nearest keyframe. Sequential sampling stays.
 
 The suite now has 185 tests and the API 27 endpoints.
+
+## Video summary and key points
+
+`summary_service` (`GET`/`POST /api/videos/{id}/summary`, "Summary" tab). It is a small
+map-reduce sized for a 3B model on CPU: the transcript is cut into sections of about
+`summary_section_words` (350) words at segment boundaries; each section gets one LLM call
+for a one-sentence key point; one last call writes a 3-4 sentence overview from those
+points. Long videos widen the sections instead of adding calls (`summary_max_sections`
+= 10), so the call count is bounded at about 11.
+
+As in RAG, the timestamps are not the model's: each key point's start/end are the real
+times of the first and last transcript segment in its section, so the player jump is
+exact to the section. The model only writes sentences. Replies are tidied
+(`clean_sentence`: stray labels, bullets, quotes), sections under 15 words are skipped, and
+the result is cached in `storage/summaries/{id}.json` (removed when the video is deleted)
+because generation takes minutes. Limits: key points are per section, not per topic, so a
+topic change in the middle of a section is not detected; the summary is only as good as
+the transcript and the 3B model. It is not yet evaluated against reference summaries.
+
+Measured on the 9-minute TED talk (1,400 words, 4 sections): 73 s end to end on this CPU,
+four key points with section times (0:06-2:21, 2:22-4:34, 4:35-7:04, 7:05-9:23), and a
+3-sentence overview. Reading them against the transcript they are on topic, but the last
+point is generic ("explained complex ideas using metaphors") rather than a specific claim,
+which is the typical weakness of a 3B model. The suite now has 200 tests and the API 29
+endpoints (the earlier "185 / 27" figures above predate this feature).

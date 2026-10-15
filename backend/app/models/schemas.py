@@ -362,3 +362,21 @@ class MultimodalSearchResponse(BaseModel):
     text_weight: float
     visual_weight: float
     results: List[MultimodalResult]
+
+
+class KeyPoint(BaseModel):
+    """One key point, tied to the stretch of video it summarises. The
+    times are the real start/end of the transcript segments in that
+    section (never invented), so the UI can jump to them."""
+
+    start_time: float
+    end_time: float
+    text: str
+
+
+class VideoSummary(BaseModel):
+    video_id: str
+    created_at: datetime
+    model: str
+    overview: str
+    key_points: List[KeyPoint]

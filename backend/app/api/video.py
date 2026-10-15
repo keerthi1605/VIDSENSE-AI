@@ -21,6 +21,7 @@ from app.models.schemas import (
     Transcript,
     TranscribeRequest,
     VideoMetadata,
+    VideoSummary,
     VideoUrlRequest,
 )
 from app.services import (
@@ -30,6 +31,7 @@ from app.services import (
     frame_service,
     library_service,
     retrieval_service,
+    summary_service,
     transcription_service,
     video_service,
     vision_service,
@@ -352,3 +354,30 @@ def delete_video(video_id: str) -> Response:
     """
     library_service.delete_video(video_id)
     return Response(status_code=204)
+
+
+@router.get("/{video_id}/summary", response_model=VideoSummary)
+def get_video_summary(video_id: str) -> VideoSummary:
+    """The cached summary and key points, or 404 if none was generated yet."""
+    video_service.get_video_metadata(video_id)  # 404s if unknown
+    summary = summary_service.get_summary(video_id)
+    if summary is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No summary yet for video '{video_id}'. Generate one with POST.",
+        )
+    return summary
+
+
+@router.post("/{video_id}/summary", response_model=VideoSummary)
+def create_video_summary(video_id: str) -> VideoSummary:
+    """
+    Generate (or regenerate) the overview and timestamped key points with the
+    local LLM. Slow on CPU -- one model call per section of the transcript --
+    so the result is cached and fetched with GET afterwards.
+    """
+    try:
+        return summary_service.generate_summary(video_id)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+

@@ -66,6 +66,17 @@ export const api = {
       body: JSON.stringify({ query, video_id: videoId || undefined, top_k: topK }),
     }),
 
+  // --- Summary + key points (cached on the backend; null when none yet) ---
+  getSummary: async (videoId) => {
+    try {
+      return await request(`/api/videos/${videoId}/summary`);
+    } catch (err) {
+      if (/no summary yet/i.test(err.message)) return null;
+      throw err;
+    }
+  },
+  createSummary: (videoId) => request(`/api/videos/${videoId}/summary`, { method: "POST" }),
+
   // --- Phase 4: RAG chat ---
   chat: (query, videoId) =>
     request("/api/chat", {
