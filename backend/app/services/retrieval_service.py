@@ -75,6 +75,9 @@ def index_video(chunk_set: ChunkSet, embedding_meta: EmbeddingSet) -> IndexResul
         for c in chunk_set.chunks
     ]
 
+    # Replace, don't merge: drop this video's old records first, so a re-run
+    # that produced fewer chunks leaves no stale ones behind.
+    vector_store_service.delete_video(settings.chroma_collection_name, chunk_set.video_id)
     count = vector_store_service.upsert(
         collection_name=settings.chroma_collection_name,
         ids=chunk_ids_from_chunks,
@@ -181,6 +184,10 @@ def index_video_frames(frame_set: FrameSet, frame_embedding_meta: FrameEmbedding
         for f in frame_set.frames
     ]
 
+    # Same replace-not-merge rule as index_video(): re-extracting frames with
+    # a stricter scene threshold yields fewer frames, and the old frame
+    # records (whose image files are gone) must not linger in search results.
+    vector_store_service.delete_video(settings.chroma_frames_collection_name, frame_set.video_id)
     count = vector_store_service.upsert(
         collection_name=settings.chroma_frames_collection_name,
         ids=frame_ids_from_frames,

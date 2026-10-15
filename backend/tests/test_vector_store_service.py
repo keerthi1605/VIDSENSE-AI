@@ -146,3 +146,35 @@ def test_separate_collections_are_independent():
     results_a = vector_store_service.query(collection_name="collection_a", query_embedding=[1.0, 0.0, 0.0], top_k=5)
     assert len(results_a) == 1
     assert results_a[0]["id"] == "a_0000"
+
+
+def test_delete_video_removes_only_that_videos_records():
+    for video_id in ("vidA", "vidB"):
+        vector_store_service.upsert(
+            collection_name=COLLECTION,
+            ids=[f"{video_id}_0", f"{video_id}_1"],
+            embeddings=[[1.0, 0.0], [0.0, 1.0]],
+            documents=["x", "y"],
+            metadatas=[{"video_id": video_id}, {"video_id": video_id}],
+        )
+    assert vector_store_service.count(COLLECTION) == 4
+
+    vector_store_service.delete_video(COLLECTION, "vidA")
+
+    assert vector_store_service.count(COLLECTION) == 2
+    remaining = {r["metadata"]["video_id"] for r in vector_store_service.query(COLLECTION, [1.0, 0.0], top_k=4)}
+    assert remaining == {"vidB"}
+
+
+def test_reindexing_with_fewer_records_leaves_no_stale_ones():
+    """The bug this fixes: upsert alone keeps the old, higher-numbered ids."""
+    def index(n):
+        vector_store_service.delete_video(COLLECTION, "vidA")
+        vector_store_service.upsert(
+            collection_name=COLLECTION, ids=[f"vidA_{i}" for i in range(n)],
+            embeddings=[[1.0, 0.0]] * n, documents=["x"] * n, metadatas=[{"video_id": "vidA"}] * n,
+        )
+
+    index(5)
+    index(3)  # a stricter scene threshold produced fewer records
+    assert vector_store_service.count(COLLECTION) == 3

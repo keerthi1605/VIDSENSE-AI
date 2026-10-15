@@ -75,6 +75,7 @@ def test_index_video_calls_upsert_with_aligned_data(monkeypatch):
         )
         return len(ids)
 
+    monkeypatch.setattr(vector_store_service, "delete_video", lambda collection_name, video_id: None)
     monkeypatch.setattr(vector_store_service, "upsert", fake_upsert)
 
     chunk_set = _chunk_set()
@@ -189,6 +190,7 @@ def test_index_video_frames_calls_upsert_with_aligned_data(monkeypatch):
         )
         return len(ids)
 
+    monkeypatch.setattr(vector_store_service, "delete_video", lambda collection_name, video_id: None)
     monkeypatch.setattr(vector_store_service, "upsert", fake_upsert)
 
     from app.core.config import settings
@@ -524,3 +526,51 @@ def test_rerank_is_skipped_when_nothing_was_retrieved(monkeypatch, rerank_on):
 
     monkeypatch.setattr(rerank_service, "rerank_scores", boom)
     assert retrieval_service.search("q").results == []
+
+
+# ---------------------------------------------------------------------
+# Re-indexing replaces a video's records instead of merging into them
+# ---------------------------------------------------------------------
+
+def test_index_video_deletes_the_videos_old_chunks_before_upserting(monkeypatch):
+    from app.core.config import settings
+
+    calls = []
+    monkeypatch.setattr(
+        embedding_service, "load_embeddings",
+        lambda video_id: np.array([[1.0, 0.0], [0.0, 1.0]], dtype=np.float32),
+    )
+    monkeypatch.setattr(
+        vector_store_service, "delete_video",
+        lambda collection_name, video_id: calls.append(("delete", collection_name, video_id)),
+    )
+    monkeypatch.setattr(
+        vector_store_service, "upsert",
+        lambda collection_name, ids, embeddings, documents, metadatas: calls.append(("upsert", collection_name)) or len(ids),
+    )
+    retrieval_service.index_video(_chunk_set(), _embedding_meta())
+
+    assert calls[0] == ("delete", settings.chroma_collection_name, "v1")  # delete FIRST
+    assert calls[1][0] == "upsert"
+
+
+def test_index_video_frames_deletes_the_videos_old_frames_before_upserting(monkeypatch):
+    from app.core.config import settings
+
+    calls = []
+    monkeypatch.setattr(
+        vision_service, "load_frame_embeddings",
+        lambda video_id: np.array([[1.0, 0.0], [0.0, 1.0]], dtype=np.float32),
+    )
+    monkeypatch.setattr(
+        vector_store_service, "delete_video",
+        lambda collection_name, video_id: calls.append(("delete", collection_name, video_id)),
+    )
+    monkeypatch.setattr(
+        vector_store_service, "upsert",
+        lambda collection_name, ids, embeddings, documents, metadatas: calls.append(("upsert", collection_name)) or len(ids),
+    )
+    retrieval_service.index_video_frames(_frame_set(), _frame_embedding_meta())
+
+    assert calls[0] == ("delete", settings.chroma_frames_collection_name, "v1")
+    assert calls[1][0] == "upsert"

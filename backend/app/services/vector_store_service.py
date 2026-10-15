@@ -134,6 +134,20 @@ def query(
     ]
 
 
+def delete_video(collection_name: str, video_id: str) -> None:
+    """
+    Remove every record of one video from a collection.
+
+    `upsert` only replaces ids that exist in the new batch, so re-indexing
+    a video whose new run produced FEWER records (a stricter scene
+    threshold, a larger chunk size) would silently leave the old, higher-
+    numbered records behind -- e.g. search results pointing at frame images
+    that no longer exist. Deleting the video's records first makes
+    re-indexing a true replace.
+    """
+    get_collection(collection_name).delete(where={"video_id": video_id})
+
+
 def count(collection_name: str) -> int:
     """Total number of records currently indexed in a collection."""
     return get_collection(collection_name).count()

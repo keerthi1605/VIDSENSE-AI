@@ -654,3 +654,18 @@ Restricted to questions whose top chunk really contains the answer: median error
 chunks, good recall) from localization granularity (single segments) is the most promising
 direction found. Limits: answer spans hand-labelled to a few seconds, one labeller, 57
 questions, not yet in the app's citations.
+
+### Bug found while preparing the project report: stale vectors after re-indexing
+
+`vector_store_service.upsert` only overwrites the ids present in the new batch. After
+re-extracting frames with SSIM (fewer frames per video than the old pixel-difference
+run), the old, higher-numbered frame records stayed in the `video_frames` collection:
+294 records were stored for 246 real frames, so visual and fused search could return
+frames whose image files no longer existed (broken thumbnails in the UI). The text
+collection was unaffected only because re-chunking happened to produce *more* chunks.
+Fix: `vector_store_service.delete_video()` and both index functions now delete a
+video's existing records before upserting, making re-indexing a true replace. Covered
+by two unit tests (delete happens first) and two real-ChromaDB tests (only the target
+video is removed; re-indexing with fewer records leaves none stale). All videos were
+re-indexed and the counts now match the manifests (198 chunks, 246 frames). The suite
+has 167 tests.
