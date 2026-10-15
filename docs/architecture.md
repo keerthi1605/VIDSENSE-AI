@@ -496,7 +496,7 @@ Question asked: where can accuracy be improved, and are reranking / hybrid searc
 needed? Method: measure first, adopt only what the data supports. Reproduce with
 `backend/scripts/retrieval_ablation.py`, `rerank_analysis.py` and `wer_eval.py`.
 
-**Test set.** 57 labelled questions over 6 videos (`scripts/eval_data/questions.json`):
+**Test set.** 57 labelled questions over 4 videos (CS101 33, vlog 13, cooking 6, news 5) (`scripts/eval_data/questions.json`):
 keyword, detail and *paraphrase* questions (the last deliberately share few words
 with the answer). Answer spans were read off the transcripts by the developer.
 Scored on the production chunks, per-video (like the UI) and pooled across every
