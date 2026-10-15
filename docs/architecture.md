@@ -567,3 +567,72 @@ single covering chunk); some "misses" are ambiguous questions with several valid
 evidence spans (the vlog's breakfast); LLM answer quality (qwen2.5:3b) was only
 spot-checked; one-developer-written labels and a 98-chunk corpus mean small differences
 should be read as noise.
+
+
+## Phase 6b — UPDATE: pilot results that did not replicate (read this before the section above)
+
+The Phase 6b write-up above reports that scene-aligned chunking "beats a size-matched
+control (89% vs 67% Hit@1)". That came from 18 CS101 questions. Re-tested on the larger
+57-question set and against independent ground truth, **it does not hold**:
+
+**1. Retrieval over 57 questions (dense only, `scripts/chunking_strategies_eval.py`):**
+
+| Chunking | Chunks | Words/chunk | Hit@1 | MRR | Words sent to LLM |
+|---|---|---|---|---|---|
+| word-count 150 | 37 | 151 | 74% | 0.852 | 670 |
+| word-count 75 (size control) | 78 | 79 | 70% | 0.800 | 381 |
+| scene-aligned (SSIM) | 82 | 63 | 61% | 0.750 | 325 |
+| topic-aligned (text only) | 42 | 128 | 67% | 0.806 | 576 |
+| scene + topic | 83 | 63 | 58% | 0.729 | 323 |
+
+Per video (Hit@1, scene-aligned vs word-count 150 / 75): CS101 (n=33) 73% vs 73% / 67%;
+vlog (n=13) **31%** vs 69% / 54%. The 22-point advantage shrank to ~2 questions on CS101,
+and on rapid-cut footage scene alignment clearly *hurts*. Cooking (n=6) and news (n=5) are
+too small to read.
+
+**2. Boundaries vs creator chapter markers** (`scripts/boundary_eval.py`; 4 videos, 35
+human-made chapter boundaries; F1 at +/-15 s; creator chapters are independent ground
+truth, unlike the earlier purity metric):
+
+| Signal | Macro F1 |
+|---|---|
+| random, same count as hybrid | 0.260 |
+| scene-SSIM / scene-MAD / PySceneDetect (visual) | 0.144 / 0.185 / 0.193 |
+| speech pauses | 0.067 |
+| fixed 60 s windows | 0.359 |
+| topic shift (transcript only) | 0.372 |
+| hybrid visual+topic+pause (settings tuned leave-one-video-out) | 0.383 |
+
+Visual detectors fire 62-84 times where creators marked 5-19 chapters (animated explainer,
+screencasts) and score *below chance*; the hybrid is essentially the topic signal (tuning
+gave the visual signal zero weight in 2 of 4 held-out folds). At +/-30 s fixed 60 s windows
+win (0.63) simply because chapters are ~60-100 s apart and the tolerance is generous --
+the +/-15 s row is the meaningful one. Chapter *purity* of scene-aligned chunks equals that
+of size-matched word-count chunks (0.949 vs 0.946): the "purity" gain reported earlier was
+a chunk-size effect.
+
+**Conclusion.** On these videos (animated explainer, code screencasts, talking-head
+lecture, vlog) visual scene boundaries are **not** a reliable chunking signal and
+scene-aligned chunking is **not** better than plain word-count chunking; it is clearly
+worse on rapid-cut footage. Text topic shifts are the most reliable boundary signal found,
+but gave no retrieval gain over plain chunks either. Untested: slide/board lectures, where
+visual cuts may track topic changes. `settings.chunk_align_to_scenes` is therefore a
+candidate to default OFF; the stored indexes of the four demo videos are still scene-aligned.
+
+**3. A positive result — citation localization** (`scripts/localization_eval.py`; 57
+questions; full retrieval stack). Jumping to the start of the cited chunk can leave the
+viewer far from the answer; re-scoring the transcript *segments inside* the retrieved chunk
+with the cross-encoder and jumping to the best one lands much closer:
+
+| Cited chunks | Jump target | Median error | Within 10 s | Within 20 s |
+|---|---|---|---|---|
+| plain word-count 150 (mean 79 s long) | chunk start | 25.2 s | 28% | 44% |
+| | best segment inside chunk | **7.1 s** | **58%** | **74%** |
+| production chunks (mean 37 s long) | chunk start | 8.6 s | 51% | 68% |
+| | best segment inside chunk | **5.7 s** | **65%** | **75%** |
+
+Restricted to questions whose top chunk really contains the answer: median error 25.2 s ->
+4.7 s (plain) and 6.4 s -> 0.5 s (production). Decoupling retrieval granularity (large
+chunks, good recall) from localization granularity (single segments) is the most promising
+direction found. Limits: answer spans hand-labelled to a few seconds, one labeller, 57
+questions, not yet in the app's citations.

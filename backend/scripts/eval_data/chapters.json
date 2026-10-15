@@ -1,0 +1,281 @@
+{
+  "_note": "Creator-published chapter markers (start second + title), fetched as metadata with yt-dlp. Used ONLY as an independent human-made topic-boundary ground truth; no video or transcript content is stored here.",
+  "videos": {
+    "core-dumped": {
+      "youtube_id": "HjneAhCy2N4",
+      "title": "HOW TRANSISTORS RUN CODE?",
+      "channel": "Core Dumped",
+      "duration_s": 868,
+      "chapters": [
+        {
+          "start": 0,
+          "title": "Introduction to transistors"
+        },
+        {
+          "start": 63,
+          "title": "Basic logic gates"
+        },
+        {
+          "start": 154,
+          "title": "Advanced logic gate abstraction"
+        },
+        {
+          "start": 298,
+          "title": "Building a simple adder"
+        },
+        {
+          "start": 427,
+          "title": "Full adders and multi-digit math"
+        },
+        {
+          "start": 532,
+          "title": "8-bit adders and subtraction"
+        },
+        {
+          "start": 649,
+          "title": "Binary decoders and instruction"
+        },
+        {
+          "start": 807,
+          "title": "Arithmetic logic unit overview"
+        }
+      ]
+    },
+    "indently-30": {
+      "youtube_id": "Ro_MScTDfU4",
+      "title": "Learn Python in Only 30 Minutes (Beginner Tutorial)",
+      "channel": "Indently",
+      "duration_s": 1842,
+      "chapters": [
+        {
+          "start": 0,
+          "title": "Learning Python made simple"
+        },
+        {
+          "start": 5,
+          "title": "Intro"
+        },
+        {
+          "start": 18,
+          "title": "Requirements"
+        },
+        {
+          "start": 32,
+          "title": "Getting started"
+        },
+        {
+          "start": 68,
+          "title": "Shortcut"
+        },
+        {
+          "start": 99,
+          "title": "Variables"
+        },
+        {
+          "start": 148,
+          "title": "Data types"
+        },
+        {
+          "start": 396,
+          "title": "Type annotations"
+        },
+        {
+          "start": 483,
+          "title": "F-strings"
+        },
+        {
+          "start": 580,
+          "title": "Functions"
+        },
+        {
+          "start": 769,
+          "title": "Looping"
+        },
+        {
+          "start": 949,
+          "title": "Comparison operators"
+        },
+        {
+          "start": 1040,
+          "title": "If..elif..else"
+        },
+        {
+          "start": 1138,
+          "title": "Your first chatbot"
+        },
+        {
+          "start": 1173,
+          "title": "Error handling"
+        },
+        {
+          "start": 1413,
+          "title": "Imports"
+        },
+        {
+          "start": 1487,
+          "title": "Creating your first project"
+        },
+        {
+          "start": 1706,
+          "title": "Testing the project"
+        },
+        {
+          "start": 1783,
+          "title": "Conclusion"
+        },
+        {
+          "start": 1831,
+          "title": "Bye bye"
+        }
+      ]
+    },
+    "telusko": {
+      "youtube_id": "8O5kX73OkIY",
+      "title": "#49 Python Tutorial for Beginners | Class and Object",
+      "channel": "Telusko",
+      "duration_s": 660,
+      "chapters": [
+        {
+          "start": 0,
+          "title": "<Untitled Chapter 1>"
+        },
+        {
+          "start": 67,
+          "title": "Define a Class"
+        },
+        {
+          "start": 98,
+          "title": "Methods"
+        },
+        {
+          "start": 215,
+          "title": "Concept of Constructors"
+        },
+        {
+          "start": 305,
+          "title": "Create Your Own Class"
+        }
+      ]
+    },
+    "indently-oop": {
+      "youtube_id": "rLyYb7BFgQI",
+      "title": "Learn Python OOP in under 20 Minutes",
+      "channel": "Indently",
+      "duration_s": 1111,
+      "chapters": [
+        {
+          "start": 0,
+          "title": "Learning Python made simple"
+        },
+        {
+          "start": 5,
+          "title": "Intro"
+        },
+        {
+          "start": 56,
+          "title": "Classes"
+        },
+        {
+          "start": 181,
+          "title": "Initialisers"
+        },
+        {
+          "start": 296,
+          "title": "Self"
+        },
+        {
+          "start": 382,
+          "title": "Methods"
+        },
+        {
+          "start": 686,
+          "title": "Dunder methods"
+        },
+        {
+          "start": 1021,
+          "title": "Conclusion"
+        }
+      ]
+    },
+    "paint-explainer": {
+      "youtube_id": "OdziYWEkDIM",
+      "title": "Every Computer Component Explained in 3 Minutes",
+      "channel": "The Paint Explainer",
+      "duration_s": 191,
+      "chapters": [
+        {
+          "start": 0,
+          "title": "Motherboard"
+        },
+        {
+          "start": 19,
+          "title": "CPU"
+        },
+        {
+          "start": 40,
+          "title": "Hard Drive"
+        },
+        {
+          "start": 64,
+          "title": "RAM"
+        },
+        {
+          "start": 101,
+          "title": "SSD"
+        },
+        {
+          "start": 114,
+          "title": "Graphics Card"
+        },
+        {
+          "start": 141,
+          "title": "Power Supply"
+        },
+        {
+          "start": 152,
+          "title": "Case"
+        },
+        {
+          "start": 168,
+          "title": "Cooling System"
+        },
+        {
+          "start": 183,
+          "title": "Wireless Card"
+        }
+      ]
+    },
+    "explainer-ted": {
+      "youtube_id": "EMbZ72cCAzI",
+      "title": "How to explain something complicated",
+      "channel": "TED-Ed",
+      "duration_s": 569,
+      "chapters": [
+        {
+          "start": 0,
+          "title": "The architecture of curiosity"
+        },
+        {
+          "start": 85,
+          "title": "The experience simulator"
+        },
+        {
+          "start": 165,
+          "title": "The impact bias challenge"
+        },
+        {
+          "start": 265,
+          "title": "Synthesized happiness"
+        },
+        {
+          "start": 372,
+          "title": "The immune system metaphor"
+        },
+        {
+          "start": 471,
+          "title": "The art of explanation"
+        }
+      ]
+    }
+  }
+}
