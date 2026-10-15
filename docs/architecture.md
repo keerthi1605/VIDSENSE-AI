@@ -488,3 +488,82 @@ missed); boundaries are accurate to the 5 s sampling interval; frame extraction
 decodes sequentially and takes roughly real-time on CPU; on rapid-cut footage
 (cooking, vlog) the word floor dominates so aligned chunking degrades to
 word-count chunking by design.
+
+
+## Phase 11 (partial) — Retrieval accuracy: reranking, hybrid search, relevance gate
+
+Question asked: where can accuracy be improved, and are reranking / hybrid search
+needed? Method: measure first, adopt only what the data supports. Reproduce with
+`backend/scripts/retrieval_ablation.py`, `rerank_analysis.py` and `wer_eval.py`.
+
+**Test set.** 57 labelled questions over 6 videos (`scripts/eval_data/questions.json`):
+keyword, detail and *paraphrase* questions (the last deliberately share few words
+with the answer). Answer spans were read off the transcripts by the developer.
+Scored on the production chunks, per-video (like the UI) and pooled across every
+video. A chunk hits when it is from the right video and covers >= 50% of the span.
+
+**What was adopted — cross-encoder reranking.** Embedding retrieval fetches a
+shortlist of 10, then `cross-encoder/ms-marco-MiniLM-L-6-v2` (22M params) reads
+query and chunk *together* and reorders it (`rerank_service`, `settings.retrieval_rerank`).
+
+| (production setting, shortlist 10) | Hit@1 | MRR | vs dense (better/worse questions) |
+|---|---|---|---|
+| per-video: dense | 68% | 0.790 | — |
+| per-video: dense + rerank | **79%** | **0.849** | +9 / −2 |
+| pooled: dense | 65% | 0.760 | — |
+| pooled: dense + rerank | **77%** | **0.827** | +10 / −2 |
+
+The gain is concentrated where embeddings are weakest — paraphrase questions
+(MRR 0.53 → 0.75); keyword questions were already strong (0.91 → 0.96). Cost:
+median **405 ms** per query on this CPU (query embedding + scoring 10 chunks, warm;
+p95 493 ms). A shortlist of 5 or 10 is about as accurate as 20 at half the cost;
+the larger `ms-marco-MiniLM-L-12-v2` was no better than L-6.
+
+**What was tested and NOT adopted — hybrid (BM25 + dense) search.** A dependency-free
+BM25 (`lexical_service`) fused with the embedding ranking (Reciprocal Rank Fusion, and
+a min-max weighted sum). Per-video MRR 0.790 → 0.806 (RRF, +5/−4 questions) and 0.832
+(weighted sum, +6/−5): inside the noise of a 57-question set, and with the reranker
+present hybrid added nothing (0.864 vs 0.865 per-video; pooled 0.843 vs 0.830 with
+more losses than the reranker alone). Dense retrieval already handles keyword questions
+well on short chunks, and the misses that remain (e.g. "yottabyte", transcribed
+"Yatsubite") are transcription errors that no retriever can fix. Hybrid was therefore
+**not wired into the app**; `lexical_service` and the ablation remain as the evidence.
+Worth re-testing if the library grows to thousands of chunks.
+
+**Relevance gate (new).** If even the best reranked chunk scores below
+`rag_min_relevance` (−7, raw logit), RAG answers "not enough information" without
+calling the LLM. The reranker's top score separates answerable from out-of-scope
+questions with AUC 0.987; at −7 all 16 off-topic test questions were refused while
+~93% of the 57 answerable ones passed. Side benefit: refusals take **0.2–0.4 s**
+instead of 15–32 s for an answered question (the CPU LLM dominates).
+*Limits:* the 16 negatives are blatantly off-topic (France, Hamlet, vaccines); a
+near-topic unanswerable question would score higher and slip through, and the
+answerable questions it wrongly refuses are ones retrieval already fails. Calibrated
+on 73 questions — treat the threshold as a starting point, not a result.
+
+**Transcript accuracy (WER).** Only one test video has genuine human captions (a
+9.5-minute talk, 1,368 reference words); the cooking clip's "captions" turned out to be
+on-screen recipe text, and the others only have auto-captions, so they cannot be scored.
+After fixing the scorer (curly apostrophes, digits vs words, HTML entities, which had
+inflated early numbers):
+
+| Whisper configuration | WER | CPU time |
+|---|---|---|
+| base, no options (before the transcript work) | 5.3% | 55 s |
+| base, current settings (VAD, no conditioning) | 5.0% | 38 s |
+| base + domain prompt | 4.8% | 43 s |
+| small | 4.2% | 115 s |
+
+About 40 of the errors in *every* row are one closing outro that is spoken but absent
+from the captions, so the true rate is roughly 2%. Reading it honestly: base is already
+very accurate on clean speech; the earlier settings changes (VAD etc.) moved WER by ~4
+words — within noise — because their purpose (avoiding hallucination over silence/noise)
+is not exercised by clean audio; `small` gains ~0.8 points for ~3x CPU time, so `base`
+stays the default. Proper-noun errors on noisy or fast speech (e.g. news: "duty rebels")
+are real but unmeasured — no reference exists for them.
+
+**Not yet addressed:** answers that straddle a chunk boundary (one test question has no
+single covering chunk); some "misses" are ambiguous questions with several valid
+evidence spans (the vlog's breakfast); LLM answer quality (qwen2.5:3b) was only
+spot-checked; one-developer-written labels and a 98-chunk corpus mean small differences
+should be read as noise.

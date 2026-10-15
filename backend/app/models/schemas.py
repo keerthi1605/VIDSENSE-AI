@@ -166,6 +166,12 @@ class SearchResult(BaseModel):
     One retrieved chunk, with everything needed to show and cite it:
     where it's from (video_id), what it says (text), where in the
     video it is (start_time/end_time), and how relevant it was (score).
+
+    `score` is always the score the result was RANKED by (higher = more
+    relevant): embedding cosine similarity, or -- when the cross-encoder
+    reranks -- sigmoid(rerank_score), so it stays monotone with the order.
+    `rerank_score` is the raw cross-encoder logit (None when reranking is
+    off); the RAG relevance gate reads it.
     """
 
     video_id: str
@@ -174,6 +180,7 @@ class SearchResult(BaseModel):
     start_time: float
     end_time: float
     score: float
+    rerank_score: Optional[float] = None
 
 
 class SearchResponse(BaseModel):

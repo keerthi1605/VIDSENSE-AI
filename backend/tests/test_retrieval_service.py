@@ -415,3 +415,112 @@ def test_top_k_truncates_fused_results_and_candidate_pool_is_wider(monkeypatch):
 def test_empty_index_returns_empty_results(monkeypatch):
     _stub_modalities(monkeypatch, [], [])
     assert retrieval_service.search_multimodal("q").results == []
+
+
+# ---------------------------------------------------------------------
+# Cross-encoder reranking inside text search
+# ---------------------------------------------------------------------
+
+def _three_dense_hits():
+    return [
+        {"id": f"v1_000{i}", "document": f"text {i}",
+         "metadata": {"video_id": "v1", "start_time": float(i), "end_time": float(i + 1)},
+         "score": 0.9 - 0.1 * i}
+        for i in range(3)
+    ]
+
+
+@pytest.fixture
+def rerank_on(monkeypatch):
+    from app.core.config import settings
+
+    monkeypatch.setattr(settings, "retrieval_rerank", True)
+    monkeypatch.setattr(settings, "rerank_candidates", 10)
+    monkeypatch.setattr(
+        embedding_service, "embed_texts", lambda texts: np.array([[1.0, 0.0]], dtype=np.float32)
+    )
+
+
+def test_rerank_reorders_results_and_exposes_both_scores(monkeypatch, rerank_on):
+    import math
+    from app.services import rerank_service
+
+    monkeypatch.setattr(vector_store_service, "query", lambda **kw: _three_dense_hits())
+    # The cross-encoder disagrees with the embedding order: it likes chunk 2 best.
+    monkeypatch.setattr(
+        rerank_service, "rerank_scores",
+        lambda query, passages: np.array([-1.0, 0.5, 3.0], dtype=np.float32),
+    )
+
+    response = retrieval_service.search("q", top_k=3)
+
+    assert [r.chunk_id for r in response.results] == ["v1_0002", "v1_0001", "v1_0000"]
+    best = response.results[0]
+    assert best.rerank_score == pytest.approx(3.0)
+    from app.core.config import settings
+
+    assert best.score == pytest.approx(1 / (1 + math.exp(-3.0 / settings.rerank_score_temperature)))
+    # Temperature keeps scores graded instead of pinned to ~0/~1.
+    assert 0.05 < response.results[-1].score < response.results[0].score < 0.95
+    scores = [r.score for r in response.results]
+    assert scores == sorted(scores, reverse=True)  # score stays monotone with rank
+
+
+def test_rerank_retrieves_a_wider_shortlist_then_truncates_to_top_k(monkeypatch, rerank_on):
+    from app.services import rerank_service
+
+    seen = {}
+
+    def fake_query(collection_name, query_embedding, top_k, video_id=None):
+        seen["retrieve_k"] = top_k
+        return _three_dense_hits()
+
+    monkeypatch.setattr(vector_store_service, "query", fake_query)
+    monkeypatch.setattr(
+        rerank_service, "rerank_scores",
+        lambda query, passages: np.array([0.0, 1.0, 2.0], dtype=np.float32),
+    )
+    response = retrieval_service.search("q", top_k=2)
+
+    assert seen["retrieve_k"] == 10  # max(top_k, rerank_candidates)
+    assert len(response.results) == 2
+
+
+def test_no_rerank_keeps_dense_order_and_never_touches_the_reranker(monkeypatch):
+    from app.core.config import settings
+    from app.services import rerank_service
+
+    assert settings.retrieval_rerank is False  # conftest default
+    monkeypatch.setattr(
+        embedding_service, "embed_texts", lambda texts: np.array([[1.0, 0.0]], dtype=np.float32)
+    )
+    seen = {}
+
+    def fake_query(collection_name, query_embedding, top_k, video_id=None):
+        seen["retrieve_k"] = top_k
+        return _three_dense_hits()
+
+    monkeypatch.setattr(vector_store_service, "query", fake_query)
+
+    def boom(*a, **k):
+        raise AssertionError("reranker must not run when retrieval_rerank is off")
+
+    monkeypatch.setattr(rerank_service, "rerank_scores", boom)
+    response = retrieval_service.search("q", top_k=3)
+
+    assert seen["retrieve_k"] == 3
+    assert [r.chunk_id for r in response.results] == ["v1_0000", "v1_0001", "v1_0002"]
+    assert all(r.rerank_score is None for r in response.results)
+    assert response.results[0].score == pytest.approx(0.9)
+
+
+def test_rerank_is_skipped_when_nothing_was_retrieved(monkeypatch, rerank_on):
+    from app.services import rerank_service
+
+    monkeypatch.setattr(vector_store_service, "query", lambda **kw: [])
+
+    def boom(*a, **k):
+        raise AssertionError("nothing to rerank")
+
+    monkeypatch.setattr(rerank_service, "rerank_scores", boom)
+    assert retrieval_service.search("q").results == []

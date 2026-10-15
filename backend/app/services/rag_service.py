@@ -89,6 +89,21 @@ def answer_question(
             query=query, answer=NO_CONTEXT_ANSWER, sources=[], has_sufficient_context=False
         )
 
+    # Relevance gate (only when the cross-encoder ran): results are sorted
+    # best-first, so if even the top chunk is judged irrelevant the question
+    # is out of scope. Refuse deterministically instead of handing a small
+    # LLM unrelated excerpts and hoping it declines -- which also saves the
+    # (slow, on CPU) generation call.
+    best_rerank = search_response.results[0].rerank_score
+    if best_rerank is not None and best_rerank < settings.rag_min_relevance:
+        logger.info(
+            "Best rerank score %.2f for query %r is below rag_min_relevance (%.2f) -- skipping LLM call.",
+            best_rerank, query, settings.rag_min_relevance,
+        )
+        return ChatResponse(
+            query=query, answer=NO_CONTEXT_ANSWER, sources=[], has_sufficient_context=False
+        )
+
     prompt = build_prompt(query, search_response.results)
     provider = llm_service.get_llm_provider()
     answer_text = provider.generate(prompt)

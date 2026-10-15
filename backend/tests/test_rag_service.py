@@ -115,3 +115,67 @@ def test_answer_question_propagates_llm_errors(monkeypatch):
 
     with pytest.raises(RuntimeError, match="Ollama is down"):
         rag_service.answer_question("anything")
+
+
+# ---------------------------------------------------------------------
+# Relevance gate (cross-encoder score decides "out of scope" up front)
+# ---------------------------------------------------------------------
+
+def _reranked(rerank_score, **kwargs):
+    result = _search_result(**kwargs)
+    return result.model_copy(update={"rerank_score": rerank_score})
+
+
+def _stub_search(monkeypatch, results):
+    monkeypatch.setattr(
+        retrieval_service, "search",
+        lambda query, top_k=None, video_id=None: SearchResponse(query=query, results=results),
+    )
+    provider = FakeProvider()
+    monkeypatch.setattr(llm_service, "get_llm_provider", lambda: provider)
+    return provider
+
+
+def test_gate_refuses_without_calling_llm_when_best_rerank_score_is_too_low(monkeypatch):
+    from app.core.config import settings
+
+    provider = _stub_search(monkeypatch, [_reranked(settings.rag_min_relevance - 0.5)])
+    response = rag_service.answer_question("what is the capital of France?")
+
+    assert response.has_sufficient_context is False
+    assert response.answer == rag_service.NO_CONTEXT_ANSWER
+    assert response.sources == []
+    assert provider.received_prompt is None  # LLM never called
+
+
+def test_gate_lets_relevant_questions_through(monkeypatch):
+    from app.core.config import settings
+
+    provider = _stub_search(monkeypatch, [_reranked(settings.rag_min_relevance + 3.0)])
+    response = rag_service.answer_question("a relevant question")
+
+    assert response.has_sufficient_context is True
+    assert provider.received_prompt is not None
+
+
+def test_gate_only_looks_at_the_top_result(monkeypatch):
+    """Results arrive best-first; a weak supporting chunk below a strong
+    top chunk must not trigger a refusal."""
+    from app.core.config import settings
+
+    _stub_search(
+        monkeypatch,
+        [_reranked(4.0, chunk_id="v1_0000"), _reranked(settings.rag_min_relevance - 5, chunk_id="v1_0001")],
+    )
+    response = rag_service.answer_question("a relevant question")
+    assert response.has_sufficient_context is True
+    assert len(response.sources) == 2
+
+
+def test_gate_is_skipped_when_results_were_not_reranked(monkeypatch):
+    """Without the cross-encoder (rerank_score None) there is nothing to
+    gate on -- behaviour is exactly the pre-gate behaviour."""
+    provider = _stub_search(monkeypatch, [_search_result(score=0.05)])
+    response = rag_service.answer_question("anything")
+    assert response.has_sufficient_context is True
+    assert provider.received_prompt is not None

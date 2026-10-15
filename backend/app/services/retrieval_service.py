@@ -12,6 +12,7 @@ result happens here, split into two clearly separate sections below.
 No LLM involved yet -- that's Phase 4 (rag_service builds on `search()`).
 """
 
+import math
 from typing import Optional
 
 from app.core.config import settings
@@ -30,7 +31,7 @@ from app.models.schemas import (
     SearchResult,
     VisualSearchResponse,
 )
-from app.services import embedding_service, vector_store_service, vision_service
+from app.services import embedding_service, rerank_service, vector_store_service, vision_service
 
 logger = get_logger(__name__)
 
@@ -98,10 +99,13 @@ def search(query: str, top_k: Optional[int] = None, video_id: Optional[str] = No
     resolved_top_k = top_k or settings.search_default_top_k
     query_embedding = embedding_service.embed_texts([query])[0]
 
+    # With reranking, fetch a wider shortlist than asked for: the point is
+    # to let the cross-encoder pull a good chunk up from just below the cut.
+    retrieve_k = max(resolved_top_k, settings.rerank_candidates) if settings.retrieval_rerank else resolved_top_k
     raw_results = vector_store_service.query(
         collection_name=settings.chroma_collection_name,
         query_embedding=query_embedding.tolist(),
-        top_k=resolved_top_k,
+        top_k=retrieve_k,
         video_id=video_id,
     )
 
@@ -116,7 +120,25 @@ def search(query: str, top_k: Optional[int] = None, video_id: Optional[str] = No
         )
         for r in raw_results
     ]
-    return SearchResponse(query=query, results=results)
+
+    if settings.retrieval_rerank and results:
+        logits = rerank_service.rerank_scores(query, [r.text for r in results])
+        order = sorted(range(len(results)), key=lambda i: -float(logits[i]))
+        results = [
+            results[i].model_copy(
+                update={
+                    "score": _sigmoid(float(logits[i]) / settings.rerank_score_temperature),
+                    "rerank_score": float(logits[i]),
+                }
+            )
+            for i in order
+        ]
+    return SearchResponse(query=query, results=results[:resolved_top_k])
+
+
+def _sigmoid(x: float) -> float:
+    """Squash a cross-encoder logit into (0, 1), keeping rank order."""
+    return 1.0 / (1.0 + math.exp(-x))
 
 
 # ---------------------------------------------------------------------

@@ -103,7 +103,8 @@ $env:HF_HUB_DISABLE_XET = "1"
 ```
 
 Set this before the first run that needs to download a new model (Whisper,
-Sentence-Transformers, CLIP); already-cached models are unaffected.
+Sentence-Transformers, CLIP, the cross-encoder reranker — ~90 MB, fetched on the
+first text search); already-cached models are unaffected.
 
 ## API (Phases 1–5): upload to answered question, plus visual search
 

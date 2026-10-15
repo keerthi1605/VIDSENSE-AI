@@ -225,6 +225,31 @@ class Settings(BaseSettings):
     # both sides to actually find time-based overlaps.
     multimodal_candidate_k: int = 10
 
+    # --- Reranking (cross-encoder) ---
+    # A small (22M-param) MS MARCO cross-encoder: reads query + chunk together
+    # and rescores the shortlist. CPU-friendly; see rerank_service.py.
+    reranker_model_name: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+    reranker_device: str = "cpu"
+    # Text search retrieves `rerank_candidates` chunks by embedding similarity,
+    # then lets the cross-encoder reorder them. Measured (backend/scripts/
+    # retrieval_ablation.py, 57 labelled questions): Hit@1 68% -> ~80%, with
+    # a shortlist of 10 about as good as 20 at half the CPU cost.
+    retrieval_rerank: bool = True
+    rerank_candidates: int = 10
+    # Reranked results report score = sigmoid(logit / temperature). A plain
+    # sigmoid pins almost everything to ~0 or ~1 (logits run about -11..+10),
+    # which reads badly in the UI and would flatten the graded text signal the
+    # fused search min-max normalises. Purely cosmetic: ranking and the RAG
+    # gate use the raw logit, so this never changes which chunk wins.
+    rerank_score_temperature: float = 4.0
+    # RAG relevance gate: if even the BEST reranked chunk scores below this
+    # (raw cross-encoder logit), the question is treated as out of scope and
+    # answered "not enough information" WITHOUT calling the LLM. Calibrated on
+    # 57 answerable vs 16 clearly off-topic questions (AUC 0.98): -7 refused
+    # all 16 and kept ~93% of the answerable ones. Small sample and easy
+    # negatives -- see docs/architecture.md before trusting it near-topic.
+    rag_min_relevance: float = -7.0
+
     def ensure_storage_dirs(self) -> None:
         """Create all storage subdirectories if they don't already exist."""
         for d in (
