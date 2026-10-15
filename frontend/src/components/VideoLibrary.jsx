@@ -8,7 +8,7 @@ function statusBadge(status) {
   return map[status] || { label: status, cls: "badge-neutral" };
 }
 
-export default function VideoLibrary({ videos, selectedVideoId, onSelect, error }) {
+export default function VideoLibrary({ videos, selectedVideoId, onSelect, onDelete, error }) {
   return (
     <div className="panel video-library">
       <h3>Your videos ({videos.length})</h3>
@@ -29,6 +29,19 @@ export default function VideoLibrary({ videos, selectedVideoId, onSelect, error 
               <div className="video-item-meta">
                 <span className={`badge ${badge.cls}`}>{badge.label}</span>
                 <span className="video-item-size">{(video.size_bytes / (1024 * 1024)).toFixed(1)} MB</span>
+                {onDelete && (
+                  <button
+                    className="video-delete"
+                    title="Delete this video and its index"
+                    aria-label={`Delete ${video.original_filename}`}
+                    onClick={(e) => {
+                      e.stopPropagation(); // don't also select the row
+                      onDelete(video);
+                    }}
+                  >
+                    ✕
+                  </button>
+                )}
               </div>
             </li>
           );

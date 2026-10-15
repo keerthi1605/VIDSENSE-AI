@@ -669,3 +669,42 @@ by two unit tests (delete happens first) and two real-ChromaDB tests (only the t
 video is removed; re-indexing with fewer records leaves none stale). All videos were
 re-indexed and the counts now match the manifests (198 chunks, 246 frames). The suite
 has 167 tests.
+
+## Usability and correctness pass: localized citations, delete, de-duplication
+
+**Citations land on the answer, not the chunk start.** A retrieved chunk spans roughly
+40-70 s. The localization study (`backend/scripts/localization_eval.py`) found that
+jumping to the chunk start was a median 25.2 s away from the labelled answer span on
+150-word chunks, versus 7.1 s when the segments inside the chunk are re-scored by the
+cross-encoder and the best one is chosen. That is now in the app: `RetrievalService.search`
+sets `jump_time` on the top `localize_top_n` (3) results, `RagService` copies it onto each
+`SourceRef`, and the UI seeks to `jump_time ?? start_time` while still showing the whole
+passage range. Controlled by `localize_citations` / `localize_top_n`. It is best-effort: if
+the transcript is missing or scoring fails, `jump_time` is `None` and the client falls back
+to the chunk start. Fused search skips it (its results are time-aligned fusions, not chunks).
+Caveat: the 7.1 s figure comes from the hand-labelled study set, not from live user queries.
+
+**Deleting a video.** `DELETE /api/videos/{id}` (`library_service.delete_video`) removes the
+stored file, metadata, transcript, chunks, embeddings, audio, the frame directory and both
+ChromaDB collections' records for that id. The id is validated against `^[A-Za-z0-9_-]+$`
+before any path is built. The library shows a delete button with a confirmation prompt.
+
+**Same link twice.** `POST /api/videos/from-url` now canonicalises the URL
+(`youtube:<11-char id>` for watch/youtu.be/shorts/embed forms, otherwise the URL without
+fragment and trailing slash). A repeat returns the existing video with HTTP 200 instead of
+downloading again (201); the UI says "already in your library".
+
+**UI.** Chat auto-scrolls to the newest answer and shows an elapsed-seconds timer while the
+local model generates; search panels show "Searching..." and a first-call model-load hint.
+
+**Verified live** (backend + Vite dev server): a 3 s test upload deleted from the UI left no
+files on disk; `youtu.be/...?si=` form of an existing link returned 200 with the library
+count unchanged; a RAG answer scrolled into view and its first citation chip seeked the
+player to 6:52 for a chip labelled 6:51.
+
+**Tried and rejected: seeking for frame extraction.** Jumping with `CAP_PROP_POS_FRAMES`
+instead of decoding sequentially was only 1.2x (Python tutorial) to 1.7x (short news clip)
+faster, and on the news clip the sampled frames differed (mean absolute pixel difference
+6.25, max 85.6) because seeks land on the nearest keyframe. Sequential sampling stays.
+
+The suite now has 185 tests and the API 27 endpoints.

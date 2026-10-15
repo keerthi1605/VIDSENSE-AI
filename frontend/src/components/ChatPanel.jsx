@@ -1,10 +1,26 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "../api";
 
 export default function ChatPanel({ video, onSeek, formatTime }) {
   const [query, setQuery] = useState("");
   const [messages, setMessages] = useState([]); // {query, answer, sources, hasContext, error}
   const [busy, setBusy] = useState(false);
+  const [elapsed, setElapsed] = useState(0);
+  const messagesRef = useRef(null);
+
+  // Keep the newest answer (and its citation chips) in view.
+  useEffect(() => {
+    const el = messagesRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [messages, busy]);
+
+  // A CPU-only language model takes 15-30 s per answer; show that it is working.
+  useEffect(() => {
+    if (!busy) return undefined;
+    setElapsed(0);
+    const timer = setInterval(() => setElapsed((s) => s + 1), 1000);
+    return () => clearInterval(timer);
+  }, [busy]);
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -32,7 +48,7 @@ export default function ChatPanel({ video, onSeek, formatTime }) {
 
   return (
     <div className="chat-panel">
-      <div className="chat-messages">
+      <div className="chat-messages" ref={messagesRef}>
         {messages.length === 0 && (
           <p className="hint">Ask a question about this video — answers cite exact timestamps.</p>
         )}
@@ -46,18 +62,32 @@ export default function ChatPanel({ video, onSeek, formatTime }) {
                 <p>{m.answer}</p>
                 {m.sources?.length > 0 && (
                   <div className="chat-sources">
-                    {m.sources.map((s, j) => (
-                      <button key={j} className="source-chip" onClick={() => onSeek(s.start_time)}>
-                        ▶ {formatTime(s.start_time)} (score {s.score.toFixed(2)})
-                      </button>
-                    ))}
+                    {m.sources.map((s, j) => {
+                      // Land on the best segment inside the cited chunk when the
+                      // backend found one; otherwise the chunk start.
+                      const target = s.jump_time ?? s.start_time;
+                      return (
+                        <button
+                          key={j}
+                          className="source-chip"
+                          title={`Cited passage ${formatTime(s.start_time)}–${formatTime(s.end_time)}`}
+                          onClick={() => onSeek(target)}
+                        >
+                          ▶ {formatTime(target)} (score {s.score.toFixed(2)})
+                        </button>
+                      );
+                    })}
                   </div>
                 )}
               </div>
             )}
           </div>
         ))}
-        {busy && <div className="chat-bubble chat-assistant chat-thinking">Thinking…</div>}
+        {busy && (
+          <div className="chat-bubble chat-assistant chat-thinking">
+            Thinking… {elapsed > 0 && <span className="thinking-timer">{elapsed} s</span>}
+          </div>
+        )}
       </div>
       <form onSubmit={handleSubmit} className="chat-input-row">
         <input

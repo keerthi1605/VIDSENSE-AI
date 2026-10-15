@@ -8,6 +8,7 @@ that's the "services stay separate from the API layer" principle.
 """
 
 import json
+import re
 import shutil
 import uuid
 from datetime import datetime, timezone
@@ -248,6 +249,32 @@ def list_all_videos() -> list[VideoMetadata]:
     ]
     videos.sort(key=lambda v: v.uploaded_at, reverse=True)
     return videos
+
+
+def canonical_source_key(url: str) -> str:
+    """
+    A stable identity for a source URL, so the same video pasted twice is
+    recognised as the same video.
+
+    YouTube links come in many spellings (watch?v=..., youtu.be/..., /shorts/...,
+    plus tracking parameters like &t=, &pp= or a whole referrer string, and
+    sometimes the address pasted twice in a row), so those are reduced to the
+    11-character video id. Anything else is compared by its address without
+    the fragment and any trailing slash.
+    """
+    match = re.search(r"(?:[?&]v=|youtu\.be/|/shorts/|/embed/)([A-Za-z0-9_-]{11})", url)
+    if match and re.search(r"youtube\.com|youtu\.be", url):
+        return f"youtube:{match.group(1)}"
+    return url.strip().split("#", 1)[0].rstrip("/")
+
+
+def find_existing_by_url(url: str) -> VideoMetadata | None:
+    """The already-ingested video for this URL, if there is one."""
+    key = canonical_source_key(url)
+    for video in list_all_videos():
+        if video.source_url and canonical_source_key(video.source_url) == key:
+            return video
+    return None
 
 
 def get_video_file_path(video_id: str) -> Path:

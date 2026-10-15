@@ -33,18 +33,23 @@ export default function SearchPanel({ video, onSeek, formatTime }) {
           disabled={busy}
         />
         <button type="submit" disabled={busy || !query.trim()}>
-          Search
+          {busy ? "Searching…" : "Search"}
         </button>
       </form>
+      {busy && <p className="hint">The first search after starting the server loads the models and can take a while.</p>}
       {error && <p className="error-text">{error}</p>}
       {results && (
         <ul className="result-list">
           {results.length === 0 && <p className="hint">No results.</p>}
           {results.map((r) => (
-            <li key={r.chunk_id} className="result-card" onClick={() => onSeek(r.start_time)}>
+            <li key={r.chunk_id} className="result-card" onClick={() => onSeek(r.jump_time ?? r.start_time)}>
               <div className="result-meta">
-                <span className="result-time">
-                  ▶ {formatTime(r.start_time)}–{formatTime(r.end_time)}
+                <span className="result-time" title="Click to jump to the best-matching moment in this passage">
+                  ▶ {formatTime(r.jump_time ?? r.start_time)}
+                  <span className="result-range">
+                    {" "}
+                    · passage {formatTime(r.start_time)}–{formatTime(r.end_time)}
+                  </span>
                 </span>
                 <span className="result-score">score {r.score.toFixed(3)}</span>
               </div>

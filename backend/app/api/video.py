@@ -7,7 +7,7 @@ return its result. No business logic lives here.
 
 from typing import List
 
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, File, HTTPException, Response, UploadFile
 from fastapi.responses import FileResponse
 
 from app.core.config import settings
@@ -28,6 +28,7 @@ from app.services import (
     chunking_service,
     embedding_service,
     frame_service,
+    library_service,
     retrieval_service,
     transcription_service,
     video_service,
@@ -51,7 +52,7 @@ async def upload_video(file: UploadFile = File(...)) -> VideoMetadata:
 
 
 @router.post("/from-url", response_model=VideoMetadata, status_code=201)
-def add_video_from_url(request: VideoUrlRequest) -> VideoMetadata:
+def add_video_from_url(request: VideoUrlRequest, response: Response) -> VideoMetadata:
     """
     Download a video from a URL (YouTube, or anything else yt-dlp
     supports) and store it exactly like a direct upload -- every
@@ -63,6 +64,12 @@ def add_video_from_url(request: VideoUrlRequest) -> VideoMetadata:
     worth async-ifying for a single-request local tool; FastAPI runs it
     in a worker thread so it doesn't block the event loop either way.
     """
+    # Idempotent: pasting a link that is already in the library returns that
+    # video (200) instead of downloading and storing a duplicate copy (201).
+    existing = video_service.find_existing_by_url(request.url)
+    if existing is not None:
+        response.status_code = 200
+        return existing
     return video_service.save_video_from_url(request.url)
 
 
@@ -334,3 +341,14 @@ def index_video_frames(video_id: str) -> FrameIndexResult:
         return retrieval_service.index_video_frames(frame_set, frame_embedding_meta)
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc))
+
+
+@router.delete("/{video_id}", status_code=204)
+def delete_video(video_id: str) -> Response:
+    """
+    Delete a video and everything derived from it: the file, audio,
+    transcript, chunks, embeddings, frame images and both vector-store
+    records. Irreversible -- the frontend asks for confirmation first.
+    """
+    library_service.delete_video(video_id)
+    return Response(status_code=204)

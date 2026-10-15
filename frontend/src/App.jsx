@@ -31,13 +31,36 @@ export default function App() {
     refreshVideos();
   }, [refreshVideos]);
 
+  const [notice, setNotice] = useState(null);
+
   const handleVideoAdded = async (metadata) => {
+    // Pasting a link that is already in the library returns the existing video
+    // (the backend does not download it again) -- say so instead of silently
+    // looking like a fresh upload.
+    const alreadyThere = videos.some((v) => v.video_id === metadata.video_id);
+    setNotice(alreadyThere ? `"${metadata.original_filename}" is already in your library — opened it.` : null);
     await refreshVideos();
     setSelectedVideo(metadata);
   };
 
   const handleSelectVideo = (metadata) => {
+    setNotice(null);
     setSelectedVideo(metadata);
+  };
+
+  const handleDeleteVideo = async (video) => {
+    const ok = window.confirm(
+      `Delete "${video.original_filename}"?\n\nThis removes the video file, its transcript, frames and search index. It cannot be undone.`
+    );
+    if (!ok) return;
+    try {
+      await api.deleteVideo(video.video_id);
+      if (selectedVideo?.video_id === video.video_id) setSelectedVideo(null);
+      setNotice(`Deleted "${video.original_filename}".`);
+      await refreshVideos();
+    } catch (err) {
+      setNotice(`Could not delete: ${err.message}`);
+    }
   };
 
   return (
@@ -59,6 +82,15 @@ export default function App() {
         </div>
       )}
 
+      {notice && (
+        <div className="banner banner-info" role="status">
+          <span>{notice}</span>
+          <button className="banner-close" onClick={() => setNotice(null)} aria-label="Dismiss">
+            ×
+          </button>
+        </div>
+      )}
+
       <div className="app-body">
         <aside className="sidebar">
           <UploadPanel onVideoAdded={handleVideoAdded} />
@@ -66,6 +98,7 @@ export default function App() {
             videos={videos}
             selectedVideoId={selectedVideo?.video_id}
             onSelect={handleSelectVideo}
+            onDelete={handleDeleteVideo}
             error={loadError}
           />
         </aside>

@@ -179,3 +179,11 @@ def test_gate_is_skipped_when_results_were_not_reranked(monkeypatch):
     response = rag_service.answer_question("anything")
     assert response.has_sufficient_context is True
     assert provider.received_prompt is not None
+
+
+def test_sources_carry_the_localized_jump_time(monkeypatch):
+    result = _search_result(start=100.0, end=170.0).model_copy(update={"jump_time": 142.5})
+    _stub_search(monkeypatch, [result])
+    response = rag_service.answer_question("q")
+    assert response.sources[0].jump_time == 142.5
+    assert response.sources[0].start_time == 100.0  # the chunk range is still reported

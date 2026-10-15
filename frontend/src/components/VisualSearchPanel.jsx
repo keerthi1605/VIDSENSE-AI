@@ -33,9 +33,10 @@ export default function VisualSearchPanel({ video, onSeek, formatTime }) {
           disabled={busy}
         />
         <button type="submit" disabled={busy || !query.trim()}>
-          Search
+          {busy ? "Searching…" : "Search"}
         </button>
       </form>
+      {busy && <p className="hint">The first search after starting the server loads the vision model and can take a while.</p>}
       {error && <p className="error-text">{error}</p>}
       {results && (
         <div className="frame-grid">

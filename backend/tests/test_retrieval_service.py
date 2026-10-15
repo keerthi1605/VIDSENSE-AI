@@ -287,7 +287,7 @@ def _frame_hit(frame_id, timestamp, score, video_id="v1"):
 def _stub_modalities(monkeypatch, text_hits, frame_hits):
     monkeypatch.setattr(
         retrieval_service, "search",
-        lambda query, top_k=None, video_id=None: SearchResponse(query=query, results=text_hits),
+        lambda query, top_k=None, video_id=None, **kw: SearchResponse(query=query, results=text_hits),
     )
     monkeypatch.setattr(
         retrieval_service, "search_frames",
@@ -400,7 +400,7 @@ def test_top_k_truncates_fused_results_and_candidate_pool_is_wider(monkeypatch):
 
     captured = {}
 
-    def fake_search(query, top_k=None, video_id=None):
+    def fake_search(query, top_k=None, video_id=None, **kw):
         captured["text_k"] = top_k
         return SearchResponse(query=query, results=[_text_hit(f"c{i}", i * 10, i * 10 + 5, 0.9 - i * 0.05) for i in range(6)])
 
@@ -574,3 +574,96 @@ def test_index_video_frames_deletes_the_videos_old_frames_before_upserting(monke
 
     assert calls[0] == ("delete", settings.chroma_frames_collection_name, "v1")
     assert calls[1][0] == "upsert"
+
+
+# ---------------------------------------------------------------------
+# Citation localization: land on the best SEGMENT inside the chunk
+# ---------------------------------------------------------------------
+
+def _transcript_with_segments(starts_texts, video_id="v1"):
+    from datetime import datetime, timezone
+    from app.models.schemas import Transcript, TranscriptSegment
+
+    segments = [
+        TranscriptSegment(segment_id=i, start_time=float(st), end_time=float(st + 4), text=tx)
+        for i, (st, tx) in enumerate(starts_texts)
+    ]
+    return Transcript(
+        video_id=video_id, language="en", duration_seconds=segments[-1].end_time, model_size="base",
+        created_at=datetime.now(timezone.utc), segments=segments,
+    )
+
+
+def _result(start=10.0, end=30.0):
+    return SearchResult(video_id="v1", chunk_id="v1_0000", text="chunk", start_time=start, end_time=end, score=0.5)
+
+
+def test_localize_returns_the_start_of_the_best_scoring_segment_inside_the_chunk(monkeypatch):
+    from app.services import rerank_service, transcription_service
+
+    transcript = _transcript_with_segments([(0, "before"), (10, "intro"), (15, "the answer"), (20, "more"), (35, "after")])
+    monkeypatch.setattr(transcription_service, "get_transcript", lambda vid: transcript)
+    seen = {}
+
+    def fake_scores(query, passages):
+        seen["passages"] = passages
+        return np.array([0.1, 2.0, 0.3], dtype=np.float32)  # best = the middle segment
+
+    monkeypatch.setattr(rerank_service, "rerank_scores", fake_scores)
+    assert retrieval_service.localize("q", _result(10, 30)) == 15.0
+    assert seen["passages"] == ["intro", "the answer", "more"]  # only segments inside the chunk
+
+
+def test_localize_without_a_transcript_or_segments_returns_none(monkeypatch):
+    from app.services import transcription_service
+
+    monkeypatch.setattr(transcription_service, "get_transcript", lambda vid: None)
+    assert retrieval_service.localize("q", _result()) is None
+
+    monkeypatch.setattr(transcription_service, "get_transcript", lambda vid: _transcript_with_segments([(100, "elsewhere")]))
+    assert retrieval_service.localize("q", _result(10, 30)) is None
+
+
+def test_localize_single_segment_chunk_skips_the_reranker(monkeypatch):
+    from app.services import rerank_service, transcription_service
+
+    monkeypatch.setattr(transcription_service, "get_transcript", lambda vid: _transcript_with_segments([(10, "only")]))
+
+    def boom(*a, **k):
+        raise AssertionError("nothing to choose between")
+
+    monkeypatch.setattr(rerank_service, "rerank_scores", boom)
+    assert retrieval_service.localize("q", _result(10, 20)) == 10.0
+
+
+def test_search_attaches_jump_time_to_the_top_results_only(monkeypatch, rerank_on):
+    from app.core.config import settings
+    from app.services import rerank_service
+
+    monkeypatch.setattr(settings, "localize_top_n", 2)
+    monkeypatch.setattr(vector_store_service, "query", lambda **kw: _three_dense_hits())
+    monkeypatch.setattr(rerank_service, "rerank_scores", lambda q, p: np.array([3.0, 2.0, 1.0][: len(p)], dtype=np.float32))
+    monkeypatch.setattr(retrieval_service, "localize", lambda q, r: r.start_time + 0.5)
+
+    results = retrieval_service.search("q", top_k=3).results
+    assert [r.jump_time for r in results] == [results[0].start_time + 0.5, results[1].start_time + 0.5, None]
+
+
+def test_search_can_skip_or_disable_localization_and_survive_its_failure(monkeypatch, rerank_on):
+    from app.core.config import settings
+    from app.services import rerank_service
+
+    monkeypatch.setattr(vector_store_service, "query", lambda **kw: _three_dense_hits())
+    monkeypatch.setattr(rerank_service, "rerank_scores", lambda q, p: np.array([3.0, 2.0, 1.0][: len(p)], dtype=np.float32))
+
+    def boom(q, r):
+        raise RuntimeError("segment scoring exploded")
+
+    monkeypatch.setattr(retrieval_service, "localize", boom)
+    # a failure inside localization must not break search -- it just leaves jump_time unset
+    assert all(r.jump_time is None for r in retrieval_service.search("q", top_k=3).results)
+
+    monkeypatch.setattr(retrieval_service, "localize", lambda q, r: 99.0)
+    assert all(r.jump_time is None for r in retrieval_service.search("q", top_k=3, localize_results=False).results)
+    monkeypatch.setattr(settings, "localize_citations", False)
+    assert all(r.jump_time is None for r in retrieval_service.search("q", top_k=3).results)

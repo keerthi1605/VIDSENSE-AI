@@ -181,6 +181,11 @@ class SearchResult(BaseModel):
     end_time: float
     score: float
     rerank_score: Optional[float] = None
+    # Where a citation click should land: the start of the single transcript
+    # segment INSIDE this chunk that best answers the query (see
+    # retrieval_service.localize). None when localization is off or not
+    # computed for this result -- callers fall back to start_time.
+    jump_time: Optional[float] = None
 
 
 class SearchResponse(BaseModel):
@@ -208,6 +213,8 @@ class SourceRef(BaseModel):
     start_time: float
     end_time: float
     score: float
+    # Segment-level landing time for the click-to-seek (see SearchResult).
+    jump_time: Optional[float] = None
 
 
 class ChatResponse(BaseModel):

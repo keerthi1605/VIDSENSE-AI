@@ -242,6 +242,14 @@ class Settings(BaseSettings):
     # fused search min-max normalises. Purely cosmetic: ranking and the RAG
     # gate use the raw logit, so this never changes which chunk wins.
     rerank_score_temperature: float = 4.0
+    # Citation localization: for the top results, re-score the transcript
+    # SEGMENTS inside the chunk with the cross-encoder and let the citation
+    # land on the best segment instead of the chunk start. Measured (57
+    # questions, backend/scripts/localization_eval.py): median landing error
+    # 25.2 s -> 7.1 s on 150-word chunks, 8.6 s -> 5.7 s on the app's chunks.
+    # Needs retrieval_rerank on. Costs one small cross-encoder pass per result.
+    localize_citations: bool = True
+    localize_top_n: int = 3
     # RAG relevance gate: if even the BEST reranked chunk scores below this
     # (raw cross-encoder logit), the question is treated as out of scope and
     # answered "not enough information" WITHOUT calling the LLM. Calibrated on

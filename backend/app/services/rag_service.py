@@ -115,6 +115,7 @@ def answer_question(
             start_time=r.start_time,
             end_time=r.end_time,
             score=r.score,
+            jump_time=r.jump_time,
         )
         for r in search_response.results
     ]

@@ -15,6 +15,8 @@ No LLM involved yet -- that's Phase 4 (rag_service builds on `search()`).
 import math
 from typing import Optional
 
+import numpy as np
+
 from app.core.config import settings
 from app.core.logging import get_logger
 from app.models.schemas import (
@@ -31,7 +33,13 @@ from app.models.schemas import (
     SearchResult,
     VisualSearchResponse,
 )
-from app.services import embedding_service, rerank_service, vector_store_service, vision_service
+from app.services import (
+    embedding_service,
+    rerank_service,
+    transcription_service,
+    vector_store_service,
+    vision_service,
+)
 
 logger = get_logger(__name__)
 
@@ -93,7 +101,12 @@ def index_video(chunk_set: ChunkSet, embedding_meta: EmbeddingSet) -> IndexResul
     )
 
 
-def search(query: str, top_k: Optional[int] = None, video_id: Optional[str] = None) -> SearchResponse:
+def search(
+    query: str,
+    top_k: Optional[int] = None,
+    video_id: Optional[str] = None,
+    localize_results: bool = True,
+) -> SearchResponse:
     """
     Embed a natural-language query (via MiniLM) and return the most
     semantically similar indexed chunks, optionally restricted to one
@@ -136,7 +149,51 @@ def search(query: str, top_k: Optional[int] = None, video_id: Optional[str] = No
             )
             for i in order
         ]
-    return SearchResponse(query=query, results=results[:resolved_top_k])
+    results = results[:resolved_top_k]
+
+    if localize_results and settings.retrieval_rerank and settings.localize_citations:
+        results = [
+            r.model_copy(update={"jump_time": _safe_localize(query, r)}) if i < settings.localize_top_n else r
+            for i, r in enumerate(results)
+        ]
+    return SearchResponse(query=query, results=results)
+
+
+def localize(query: str, result: SearchResult) -> Optional[float]:
+    """
+    Where should a citation click land inside this chunk?
+
+    A chunk can span a minute or more of speech, so jumping to its START can
+    leave the viewer scrubbing for the answer. Re-score each transcript
+    SEGMENT inside the chunk with the cross-encoder and return the start of
+    the best one -- a real segment boundary, so the "timestamps are never
+    interpolated" rule still holds. Returns None when the transcript is
+    missing or the chunk holds no segment.
+    """
+    transcript = transcription_service.get_transcript(result.video_id)
+    if transcript is None:
+        return None
+    inside = [
+        s for s in transcript.segments
+        if s.start_time >= result.start_time - 0.01 and s.end_time <= result.end_time + 0.01
+    ]
+    if not inside:
+        inside = [s for s in transcript.segments if result.start_time <= s.start_time < result.end_time]
+    if not inside:
+        return None
+    if len(inside) == 1:
+        return inside[0].start_time
+    scores = rerank_service.rerank_scores(query, [s.text for s in inside])
+    return inside[int(np.argmax(scores))].start_time
+
+
+def _safe_localize(query: str, result: SearchResult) -> Optional[float]:
+    """Localization only refines a citation; it must never break search."""
+    try:
+        return localize(query, result)
+    except Exception:  # noqa: BLE001 -- enhancement, not a requirement
+        logger.warning("Citation localization failed for %s; using chunk start.", result.chunk_id, exc_info=True)
+        return None
 
 
 def _sigmoid(x: float) -> float:
@@ -292,7 +349,8 @@ def search_multimodal(
         raise ValueError("Fusion weights must be non-negative.")
 
     candidate_k = max(settings.multimodal_candidate_k, resolved_top_k)
-    text_hits = search(query, top_k=candidate_k, video_id=video_id).results
+    # Fusion works on chunk time ranges, so skip the per-segment citation refinement.
+    text_hits = search(query, top_k=candidate_k, video_id=video_id, localize_results=False).results
     frame_hits = search_frames(query, top_k=candidate_k, video_id=video_id).results
 
     text_scores = _min_max_normalize([h.score for h in text_hits])

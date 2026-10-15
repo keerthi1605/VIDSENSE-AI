@@ -43,7 +43,7 @@ export default function MultimodalSearchPanel({ video, onSeek, formatTime }) {
           disabled={busy}
         />
         <button type="submit" disabled={busy || !query.trim()}>
-          Search
+          {busy ? "Searching…" : "Search"}
         </button>
       </form>
 
@@ -65,6 +65,7 @@ export default function MultimodalSearchPanel({ video, onSeek, formatTime }) {
         </span>
       </div>
 
+      {busy && <p className="hint">The first fused search after starting the server loads both models and can take a while.</p>}
       {error && <p className="error-text">{error}</p>}
       {results && (
         <ul className="result-list">

@@ -26,6 +26,8 @@ export const api = {
   // --- Videos ---
   listVideos: () => request("/api/videos"),
   getVideo: (videoId) => request(`/api/videos/${videoId}`),
+  // Removes the video and everything derived from it (irreversible).
+  deleteVideo: (videoId) => request(`/api/videos/${videoId}`, { method: "DELETE" }),
   videoFileUrl: (videoId) => `${BASE_URL}/api/videos/${videoId}/file`,
   uploadVideo: (file) => {
     const form = new FormData();
