@@ -544,7 +544,7 @@
 
 .evidence-visual {
   background: rgba(192, 132, 252, 0.15);
-  color: #c084fc;
+  color: #7c3aed;
 }
 
 .evidence-both {
@@ -627,11 +627,11 @@
 
 /* --- Summary tab --- */
 .summary-panel { display: flex; flex-direction: column; gap: 0.5rem; overflow-y: auto; min-height: 0; }
-.summary-heading { margin: 0.4rem 0 0; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted, #8b93a7); }
+.summary-heading { margin: 0.4rem 0 0; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-dim); }
 .summary-overview { margin: 0; line-height: 1.5; }
 .keypoint-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.4rem; }
-.keypoint { display: flex; flex-direction: column; gap: 0.15rem; padding: 0.5rem 0.65rem; border-radius: 6px; background: rgba(255, 255, 255, 0.04); cursor: pointer; }
-.keypoint:hover { background: rgba(255, 255, 255, 0.08); }
+.keypoint { display: flex; flex-direction: column; gap: 0.15rem; padding: 0.5rem 0.65rem; border-radius: 6px; background: rgba(26, 31, 46, 0.04); cursor: pointer; }
+.keypoint:hover { background: rgba(26, 31, 46, 0.09); }
 .keypoint-text { line-height: 1.4; }
 .summary-regen { align-self: flex-start; margin-top: 0.25rem; }
 .summary-empty { display: flex; flex-direction: column; gap: 0.6rem; align-items: flex-start; }
