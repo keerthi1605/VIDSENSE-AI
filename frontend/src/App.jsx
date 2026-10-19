@@ -119,12 +119,6 @@ export default function App() {
         </div>
       )}
 
-      {readOnly && (
-        <div className="banner banner-info" role="status">
-          <span>Read-only demo: you can browse, search and ask questions. Uploading, processing and deleting are turned off.</span>
-        </div>
-      )}
-
       {notice && (
         <div className="banner banner-info" role="status">
           <span>{notice}</span>
