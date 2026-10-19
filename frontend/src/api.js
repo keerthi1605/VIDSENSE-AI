@@ -2,7 +2,9 @@
 // endpoint, mirroring the backend's own route names -- keeps this file
 // a 1:1 map to docs/architecture.md rather than its own abstraction.
 
-const BASE_URL = "http://127.0.0.1:8000";
+// Dev default is the local backend. The Docker build sets VITE_API_BASE="" so requests are
+// same-origin and nginx forwards /api and /health to the backend container.
+const BASE_URL = import.meta.env.VITE_API_BASE ?? "http://127.0.0.1:8000";
 
 async function request(path, options = {}) {
   const response = await fetch(`${BASE_URL}${path}`, {

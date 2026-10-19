@@ -1,0 +1,48 @@
+# VidSense AI: web (nginx + React) -> backend (FastAPI) -> Ollama (language model).
+#
+# Local test, reusing the Ollama already installed on this PC (saves re-downloading the model):
+#   copy .env.docker.example .env      (sets OLLAMA_BASE_URL to the host)
+#   docker compose up --build
+#
+# Server (AWS): run Ollama in a container too:
+#   docker compose --profile ollama up -d --build
+#   docker compose exec ollama ollama pull qwen2.5:3b      (first time only)
+
+services:
+  ollama:
+    image: ollama/ollama:latest
+    profiles: ["ollama"]
+    volumes:
+      - ollama_models:/root/.ollama
+    restart: unless-stopped
+
+  backend:
+    build: ./backend
+    environment:
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://ollama:11434}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5:3b}
+      LLM_REQUEST_TIMEOUT_SECONDS: ${LLM_REQUEST_TIMEOUT_SECONDS:-300}
+    volumes:
+      - storage:/app/storage
+      - chroma_db:/app/chroma_db
+      - hf_cache:/app/.cache/huggingface
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # lets the container reach an Ollama running on the host
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_BASE: ""
+    ports:
+      - "${WEB_PORT:-8080}:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  storage:
+  chroma_db:
+  hf_cache:
+  ollama_models:
