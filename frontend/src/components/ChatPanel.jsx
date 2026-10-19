@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api";
+import FormattedAnswer from "./FormattedAnswer";
 
 export default function ChatPanel({ video, onSeek, formatTime }) {
   const [query, setQuery] = useState("");
@@ -59,7 +60,7 @@ export default function ChatPanel({ video, onSeek, formatTime }) {
               <div className="chat-bubble chat-error">{m.error}</div>
             ) : (
               <div className={`chat-bubble chat-assistant ${!m.hasContext ? "chat-no-context" : ""}`}>
-                <p>{m.answer}</p>
+                <FormattedAnswer text={m.answer} />
                 {m.sources?.length > 0 && (
                   <div className="chat-sources">
                     {m.sources.map((s, j) => {
