@@ -22,6 +22,7 @@ services:
       OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://ollama:11434}
       OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5:3b}
       LLM_REQUEST_TIMEOUT_SECONDS: ${LLM_REQUEST_TIMEOUT_SECONDS:-300}
+      READ_ONLY: ${READ_ONLY:-false}   # true = public demo: no uploads, processing or deletes
     volumes:
       - storage:/app/storage
       - chroma_db:/app/chroma_db

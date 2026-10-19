@@ -2,9 +2,49 @@
 // endpoint, mirroring the backend's own route names -- keeps this file
 // a 1:1 map to docs/architecture.md rather than its own abstraction.
 
-// Dev default is the local backend. The Docker build sets VITE_API_BASE="" so requests are
-// same-origin and nginx forwards /api and /health to the backend container.
-const BASE_URL = import.meta.env.VITE_API_BASE ?? "http://127.0.0.1:8000";
+// Where the backend lives, in order of priority:
+//   1. an address the user pasted in the browser (kept in localStorage) -- lets a static frontend
+//      (e.g. on Vercel) follow a backend whose public address changes, such as a tunnel to a PC;
+//   2. VITE_API_BASE chosen at build time (the Docker build sets "" for same-origin requests,
+//      which nginx forwards to the backend container);
+//   3. the local dev backend.
+const STORAGE_KEY = "vidsenseApiBase";
+
+function resolveBase() {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) return saved;
+  } catch {
+    // storage unavailable (private window): fall through to the build-time default
+  }
+  return import.meta.env.VITE_API_BASE ?? "http://127.0.0.1:8000";
+}
+
+let BASE_URL = resolveBase();
+
+export const getApiBase = () => BASE_URL;
+
+// Only http(s) addresses are accepted; a trailing slash is dropped. Returns an error message or null.
+export function saveApiBase(value) {
+  const url = value.trim().replace(/\/+$/, "");
+  if (!/^https?:\/\/[^\s]+$/i.test(url)) return "Enter a full address starting with http:// or https://";
+  try {
+    localStorage.setItem(STORAGE_KEY, url);
+  } catch {
+    return "This browser blocked saving the address.";
+  }
+  BASE_URL = url;
+  return null;
+}
+
+export function clearApiBase() {
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    // ignore
+  }
+  BASE_URL = resolveBase();
+}
 
 async function request(path, options = {}) {
   const response = await fetch(`${BASE_URL}${path}`, {

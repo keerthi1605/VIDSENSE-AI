@@ -48,7 +48,7 @@ function StepRow({ label, status, error }) {
   );
 }
 
-export default function PipelineStatus({ video, onUpdated }) {
+export default function PipelineStatus({ video, onUpdated, readOnly = false }) {
   const [textStatus, setTextStatus] = useState({});
   const [visualStatus, setVisualStatus] = useState({});
   const [textRunning, setTextRunning] = useState(false);
@@ -133,7 +133,7 @@ export default function PipelineStatus({ video, onUpdated }) {
             <h3>Text pipeline</h3>
             <button
               onClick={() => runPipeline(TEXT_STEPS, textStatus, setTextStatus, setTextRunning)}
-              disabled={textRunning || allTextDone}
+              disabled={textRunning || allTextDone || readOnly}
             >
               {allTextDone ? "Done" : textRunning ? "Running…" : "Run"}
             </button>
@@ -150,7 +150,7 @@ export default function PipelineStatus({ video, onUpdated }) {
             <h3>Visual pipeline</h3>
             <button
               onClick={() => runPipeline(VISUAL_STEPS, visualStatus, setVisualStatus, setVisualRunning)}
-              disabled={visualRunning || allVisualDone}
+              disabled={visualRunning || allVisualDone || readOnly}
             >
               {allVisualDone ? "Done" : visualRunning ? "Running…" : "Run"}
             </button>

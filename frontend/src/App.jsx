@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { api } from "./api";
+import { api, getApiBase, saveApiBase, clearApiBase } from "./api";
 import UploadPanel from "./components/UploadPanel";
 import VideoLibrary from "./components/VideoLibrary";
 import PipelineStatus from "./components/PipelineStatus";
@@ -11,6 +11,9 @@ export default function App() {
   const [selectedVideo, setSelectedVideo] = useState(null);
   const [backendUp, setBackendUp] = useState(null);
   const [loadError, setLoadError] = useState(null);
+  const [readOnly, setReadOnly] = useState(false);
+  const [addressInput, setAddressInput] = useState("");
+  const [addressError, setAddressError] = useState(null);
 
   const refreshVideos = useCallback(async () => {
     try {
@@ -26,12 +29,30 @@ export default function App() {
   useEffect(() => {
     api
       .health()
-      .then(() => setBackendUp(true))
+      .then((h) => {
+        setBackendUp(true);
+        setReadOnly(Boolean(h && h.read_only));
+      })
       .catch(() => setBackendUp(false));
     refreshVideos();
   }, [refreshVideos]);
 
   const [notice, setNotice] = useState(null);
+
+  // Point the app at a different backend (e.g. a new tunnel address) and start over.
+  const handleSaveAddress = (event) => {
+    event.preventDefault();
+    const problem = saveApiBase(addressInput);
+    if (problem) {
+      setAddressError(problem);
+      return;
+    }
+    window.location.reload();
+  };
+  const handleResetAddress = () => {
+    clearApiBase();
+    window.location.reload();
+  };
 
   const handleVideoAdded = async (metadata) => {
     // Pasting a link that is already in the library returns the existing video
@@ -76,9 +97,31 @@ export default function App() {
       </header>
 
       {backendUp === false && (
-        <div className="banner banner-error">
-          Can't reach the backend at http://127.0.0.1:8000. Start it with{" "}
-          <code>uvicorn app.main:app --reload</code> from the <code>backend/</code> folder.
+        <div className="banner banner-error banner-stack">
+          <span>
+            Can't reach the backend at <code>{getApiBase() || "this site"}</code>. Start it (for local development:{" "}
+            <code>uvicorn app.main:app --reload</code> from the <code>backend/</code> folder), or enter its address below.
+          </span>
+          <form className="address-form" onSubmit={handleSaveAddress}>
+            <input
+              type="text"
+              placeholder="https://your-backend-address"
+              value={addressInput}
+              onChange={(e) => setAddressInput(e.target.value)}
+              aria-label="Backend address"
+            />
+            <button type="submit">Use this address</button>
+            <button type="button" onClick={handleResetAddress}>
+              Reset
+            </button>
+          </form>
+          {addressError && <span className="error-text">{addressError}</span>}
+        </div>
+      )}
+
+      {readOnly && (
+        <div className="banner banner-info" role="status">
+          <span>Read-only demo: you can browse, search and ask questions. Uploading, processing and deleting are turned off.</span>
         </div>
       )}
 
@@ -93,12 +136,13 @@ export default function App() {
 
       <div className="app-body">
         <aside className="sidebar">
-          <UploadPanel onVideoAdded={handleVideoAdded} />
+          {!readOnly && <UploadPanel onVideoAdded={handleVideoAdded} />}
           <VideoLibrary
             videos={videos}
             selectedVideoId={selectedVideo?.video_id}
             onSelect={handleSelectVideo}
             onDelete={handleDeleteVideo}
+            readOnly={readOnly}
             error={loadError}
           />
         </aside>
@@ -114,6 +158,7 @@ export default function App() {
               <PipelineStatus
                 key={selectedVideo.video_id}
                 video={selectedVideo}
+                readOnly={readOnly}
                 onUpdated={(meta) => setSelectedVideo(meta)}
               />
               <VideoWorkspace video={selectedVideo} />

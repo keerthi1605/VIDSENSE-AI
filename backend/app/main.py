@@ -8,8 +8,9 @@ added in the next steps of Phase 1 (see docs/architecture.md).
 
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app.api.chat import router as chat_router
 from app.api.search import router as search_router
@@ -36,6 +37,25 @@ app = FastAPI(
     debug=settings.debug,
     lifespan=lifespan,
 )
+
+# Read-only demo mode. Registered before the CORS middleware so that CORS wraps it and the
+# browser can read the 403 message. Search and chat are POSTs but only read, so they stay open.
+READ_ONLY_OPEN_PREFIXES = ("/api/search", "/api/chat")
+
+
+@app.middleware("http")
+async def read_only_guard(request: Request, call_next):
+    if (
+        settings.read_only
+        and request.method not in ("GET", "HEAD", "OPTIONS")
+        and not request.url.path.startswith(READ_ONLY_OPEN_PREFIXES)
+    ):
+        return JSONResponse(
+            status_code=403,
+            content={"detail": "This deployment is read-only: uploads, processing and deletes are disabled."},
+        )
+    return await call_next(request)
+
 
 # CORS: the frontend (Vite dev server, Phase 8) runs on a different
 # origin/port than this API. Wide open for local development only --
@@ -67,4 +87,5 @@ def health_check() -> dict:
         "app_name": settings.app_name,
         "whisper_model_size": settings.whisper_model_size,
         "whisper_device": settings.whisper_device,
+        "read_only": settings.read_only,
     }

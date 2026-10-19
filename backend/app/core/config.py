@@ -159,6 +159,12 @@ class Settings(BaseSettings):
     ollama_model: str = "qwen2.5:3b"
     llm_request_timeout_seconds: int = 120
 
+    # --- Public demo mode ---
+    # When true the API only serves reads, search and chat: uploads, URL ingestion, pipeline steps,
+    # summary generation and deletes are refused with HTTP 403. Use it when the backend is exposed
+    # publicly (e.g. through a tunnel), since the app has no login.
+    read_only: bool = False
+
     # --- Video summary / key points ---
     # The transcript is split into sections of about this many words; each
     # section gets one LLM call for its key point, and one more call writes

@@ -635,3 +635,9 @@
 .keypoint-text { line-height: 1.4; }
 .summary-regen { align-self: flex-start; margin-top: 0.25rem; }
 .summary-empty { display: flex; flex-direction: column; gap: 0.6rem; align-items: flex-start; }
+
+/* --- Backend address form (shown when the backend is unreachable) --- */
+.banner-stack { display: flex; flex-direction: column; gap: 0.5rem; }
+.address-form { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.address-form input { flex: 1 1 18rem; min-width: 12rem; }
+
